@@ -288,3 +288,58 @@ class TestImportMemories:
                 self.memory_dir, zip_bytes,
                 log_file=os.path.join(self.manager_dir, "logs", "ops.jsonl"),
             )
+
+
+class TestEditMemory:
+    def setup_method(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.memory_dir = os.path.join(self.tmpdir, "memory")
+        os.makedirs(self.memory_dir)
+
+    def teardown_method(self):
+        shutil.rmtree(self.tmpdir)
+
+    def test_edit_succeeds_when_content_matches(self):
+        filepath = os.path.join(self.memory_dir, "a.md")
+        with open(filepath, "w") as f:
+            f.write("old content")
+        from memory_ops import edit_memory
+        edit_memory(self.memory_dir, "a.md", "old content", "new content")
+        with open(filepath) as f:
+            assert f.read() == "new content"
+
+    def test_edit_fails_when_content_changed(self):
+        filepath = os.path.join(self.memory_dir, "a.md")
+        with open(filepath, "w") as f:
+            f.write("someone else changed this")
+        from memory_ops import edit_memory
+        with pytest.raises(ValueError, match="conflict"):
+            edit_memory(self.memory_dir, "a.md", "old content", "new content")
+
+
+class TestEditIndex:
+    def setup_method(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.memory_dir = os.path.join(self.tmpdir, "memory")
+        os.makedirs(self.memory_dir)
+
+    def teardown_method(self):
+        shutil.rmtree(self.tmpdir)
+
+    def test_edit_index_replaces_line(self):
+        with open(os.path.join(self.memory_dir, "MEMORY.md"), "w") as f:
+            f.write("- [a.md](a.md) — old desc\n- [b.md](b.md) — keep\n")
+        from memory_ops import edit_index
+        edit_index(self.memory_dir, "- [a.md](a.md) — old desc", "- [a.md](a.md) — new desc")
+        with open(os.path.join(self.memory_dir, "MEMORY.md")) as f:
+            content = f.read()
+        assert "new desc" in content
+        assert "old desc" not in content
+        assert "keep" in content
+
+    def test_edit_index_conflict(self):
+        with open(os.path.join(self.memory_dir, "MEMORY.md"), "w") as f:
+            f.write("- [a.md](a.md) — actual\n")
+        from memory_ops import edit_index
+        with pytest.raises(ValueError, match="conflict"):
+            edit_index(self.memory_dir, "- [a.md](a.md) — wrong", "- [a.md](a.md) — new")

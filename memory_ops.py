@@ -234,6 +234,27 @@ def import_memories(memory_dir, zip_bytes, container_id="", log_file=None):
     _write_log({"action": "import", "container": container_id, "files": imported_files, "source_zip": "upload"}, log_file=log_file)
 
 
+def edit_memory(memory_dir, filename, old_content, new_content):
+    filepath = os.path.join(memory_dir, filename)
+    with open(filepath, "r") as f:
+        current = f.read()
+    if current != old_content:
+        raise ValueError("conflict: file has been modified since last read")
+    with open(filepath, "w") as f:
+        f.write(new_content)
+
+
+def edit_index(memory_dir, old_line, new_line):
+    index_path = os.path.join(memory_dir, "MEMORY.md")
+    with open(index_path, "r") as f:
+        content = f.read()
+    if old_line not in content:
+        raise ValueError("conflict: index line not found, may have been modified")
+    content = content.replace(old_line, new_line, 1)
+    with open(index_path, "w") as f:
+        f.write(content)
+
+
 def list_containers(global_dir=None, projects_dir=None):
     if global_dir is None:
         global_dir = str(GLOBAL_MEMORY_DIR)
