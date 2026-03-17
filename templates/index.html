@@ -267,7 +267,7 @@ body {
 .folder.active .count { color: var(--accent-text); background: var(--accent-glow); }
 
 /* ═══════════════ MIDDLE PANEL — MEMORY LIST ═══════════════ */
-.memories { flex: 1; }
+.memories { flex: 1; min-width: 200px; }
 .memory-list { flex: 1; overflow-y: auto; }
 .memory-list table { width: 100%; border-collapse: collapse; }
 .memory-list th {
@@ -429,7 +429,7 @@ body {
 }
 
 /* ═══════════════ RIGHT PANEL — PREVIEW ═══════════════ */
-.preview { flex: 1; }
+.preview { width: 38%; flex-shrink: 0; min-width: 200px; }
 .preview-header {
   padding: 12px 16px;
   border-bottom: 1px solid var(--border);
@@ -590,26 +590,32 @@ function toggleTheme() {
 })();
 
 /* ═══════════════ RESIZABLE PANELS ═══════════════ */
-function initResize(handleId, getLeft, getRight, setLeft, setRight) {
+function initResize(handleId, leftEl, rightEl) {
   const handle = document.getElementById(handleId);
   let startX, startLeftW, startRightW;
 
   handle.addEventListener('mousedown', (e) => {
     e.preventDefault();
     handle.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
     startX = e.clientX;
-    startLeftW = getLeft().getBoundingClientRect().width;
-    startRightW = getRight().getBoundingClientRect().width;
+    startLeftW = leftEl.getBoundingClientRect().width;
+    startRightW = rightEl.getBoundingClientRect().width;
 
     function onMove(e) {
-      const dx = e.clientX - startX;
-      const newLeft = Math.max(160, startLeftW + dx);
-      const newRight = Math.max(160, startRightW - dx);
-      setLeft(newLeft);
-      setRight(newRight);
+      let dx = e.clientX - startX;
+      dx = Math.max(dx, 160 - startLeftW);
+      dx = Math.min(dx, startRightW - 160);
+      leftEl.style.width = (startLeftW + dx) + 'px';
+      leftEl.style.flex = 'none';
+      rightEl.style.width = (startRightW - dx) + 'px';
+      rightEl.style.flex = 'none';
     }
     function onUp() {
       handle.classList.remove('dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
     }
@@ -619,20 +625,11 @@ function initResize(handleId, getLeft, getRight, setLeft, setRight) {
 }
 
 const foldersPanel = document.getElementById('foldersPanel');
+const memoriesPanel = document.querySelector('.memories');
 const previewPanel = document.getElementById('preview');
 
-initResize('resizeLeft',
-  () => foldersPanel,
-  () => foldersPanel.nextElementSibling.nextElementSibling,
-  (w) => foldersPanel.style.width = w + 'px',
-  () => {}
-);
-initResize('resizeRight',
-  () => previewPanel.previousElementSibling.previousElementSibling,
-  () => previewPanel,
-  () => {},
-  (w) => previewPanel.style.width = w + 'px'
-);
+initResize('resizeLeft', foldersPanel, memoriesPanel);
+initResize('resizeRight', memoriesPanel, previewPanel);
 
 /* ═══════════════ STATE ═══════════════ */
 let containers = [];
