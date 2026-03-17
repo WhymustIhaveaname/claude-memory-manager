@@ -103,6 +103,98 @@ def _friendly_name(encoded):
     return encoded.replace("-", "/")
 
 
+def _write_log(entry, log_file=None):
+    if log_file is None:
+        log_file = str(LOG_FILE)
+    os.makedirs(os.path.dirname(log_file), exist_ok=True)
+    entry["timestamp"] = datetime.now().isoformat()
+    with open(log_file, "a") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+def _backup_file(filepath, backup_dir=None):
+    if backup_dir is None:
+        backup_dir = str(BACKUP_DIR)
+    os.makedirs(backup_dir, exist_ok=True)
+    ts = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+    backup_name = f"{ts}_{os.path.basename(filepath)}"
+    backup_path = os.path.join(backup_dir, backup_name)
+    shutil.copy2(filepath, backup_path)
+    return backup_path
+
+
+def _remove_index_lines(memory_dir, filenames):
+    index_path = os.path.join(memory_dir, "MEMORY.md")
+    if not os.path.exists(index_path):
+        return {}
+    removed = {}
+    with open(index_path, "r") as f:
+        lines = f.readlines()
+    new_lines = []
+    for line in lines:
+        matched = False
+        for fname in filenames:
+            if f"[{fname}]" in line:
+                removed[fname] = line.strip()
+                matched = True
+                break
+        if not matched:
+            new_lines.append(line)
+    with open(index_path, "w") as f:
+        f.writelines(new_lines)
+    return removed
+
+
+def _append_index_lines(memory_dir, lines):
+    """Append lines to MEMORY.md. Ensures a leading newline if file doesn't end with one."""
+    index_path = os.path.join(memory_dir, "MEMORY.md")
+    os.makedirs(memory_dir, exist_ok=True)
+    if os.path.exists(index_path):
+        with open(index_path, "r") as f:
+            content = f.read()
+        if content and not content.endswith("\n"):
+            with open(index_path, "a") as f:
+                f.write("\n")
+    with open(index_path, "a") as f:
+        for line in lines:
+            f.write(line + "\n")
+
+
+def delete_memories(memory_dir, filenames, container_id="", log_file=None, backup_dir=None):
+    removed_lines = _remove_index_lines(memory_dir, filenames)
+    for fname in filenames:
+        filepath = os.path.join(memory_dir, fname)
+        if os.path.exists(filepath):
+            backup_path = _backup_file(filepath, backup_dir=backup_dir)
+            _write_log({
+                "action": "delete",
+                "container": container_id,
+                "file": fname,
+                "index_line": removed_lines.get(fname, ""),
+                "backup_path": backup_path,
+            }, log_file=log_file)
+            os.remove(filepath)
+
+
+def move_memories(src_dir, dst_dir, filenames, from_id="", to_id="", log_file=None):
+    for fname in filenames:
+        if os.path.exists(os.path.join(dst_dir, fname)):
+            raise FileExistsError(f"File already exists in target: {fname}")
+    removed_lines = _remove_index_lines(src_dir, filenames)
+    lines_to_add = []
+    for fname in filenames:
+        src_path = os.path.join(src_dir, fname)
+        dst_path = os.path.join(dst_dir, fname)
+        shutil.copy2(src_path, dst_path)
+        os.remove(src_path)
+        index_line = removed_lines.get(fname, f"- [{fname}]({fname}) — ")
+        lines_to_add.append(index_line)
+        _write_log({
+            "action": "move", "file": fname, "from": from_id, "to": to_id, "index_line": index_line,
+        }, log_file=log_file)
+    _append_index_lines(dst_dir, lines_to_add)
+
+
 def list_containers(global_dir=None, projects_dir=None):
     if global_dir is None:
         global_dir = str(GLOBAL_MEMORY_DIR)

@@ -92,3 +92,121 @@ class TestListContainers:
         assert containers[0]["count"] == 1
         assert containers[1]["id"] == "-home-user-myproject"
         assert "myproject" in containers[1]["name"]
+
+
+class TestLoggingAndBackup:
+    def setup_method(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.manager_dir = os.path.join(self.tmpdir, "manager")
+
+    def teardown_method(self):
+        shutil.rmtree(self.tmpdir)
+
+    def test_write_log(self):
+        from memory_ops import _write_log
+        log_file = os.path.join(self.manager_dir, "logs", "operations.jsonl")
+        _write_log({"action": "test", "file": "x.md"}, log_file=log_file)
+        with open(log_file) as f:
+            line = json.loads(f.readline())
+        assert line["action"] == "test"
+        assert "timestamp" in line
+
+    def test_backup_file(self):
+        from memory_ops import _backup_file
+        src = os.path.join(self.tmpdir, "source.md")
+        with open(src, "w") as f:
+            f.write("backup me")
+        backup_dir = os.path.join(self.manager_dir, "backups")
+        path = _backup_file(src, backup_dir=backup_dir)
+        assert os.path.exists(path)
+        with open(path) as f:
+            assert f.read() == "backup me"
+
+
+class TestDeleteMemories:
+    def setup_method(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.memory_dir = os.path.join(self.tmpdir, "memory")
+        self.manager_dir = os.path.join(self.tmpdir, "manager")
+        os.makedirs(self.memory_dir)
+
+    def teardown_method(self):
+        shutil.rmtree(self.tmpdir)
+
+    def test_delete_removes_file_and_index(self):
+        with open(os.path.join(self.memory_dir, "a.md"), "w") as f:
+            f.write("content a")
+        with open(os.path.join(self.memory_dir, "MEMORY.md"), "w") as f:
+            f.write("- [a.md](a.md) — desc a\n- [b.md](b.md) — desc b\n")
+        from memory_ops import delete_memories
+        delete_memories(
+            self.memory_dir, ["a.md"],
+            log_file=os.path.join(self.manager_dir, "logs", "ops.jsonl"),
+            backup_dir=os.path.join(self.manager_dir, "backups"),
+        )
+        assert not os.path.exists(os.path.join(self.memory_dir, "a.md"))
+        with open(os.path.join(self.memory_dir, "MEMORY.md")) as f:
+            content = f.read()
+        assert "a.md" not in content
+        assert "b.md" in content
+
+    def test_delete_creates_backup(self):
+        with open(os.path.join(self.memory_dir, "a.md"), "w") as f:
+            f.write("backup me")
+        with open(os.path.join(self.memory_dir, "MEMORY.md"), "w") as f:
+            f.write("- [a.md](a.md) — desc\n")
+        from memory_ops import delete_memories
+        delete_memories(
+            self.memory_dir, ["a.md"],
+            log_file=os.path.join(self.manager_dir, "logs", "ops.jsonl"),
+            backup_dir=os.path.join(self.manager_dir, "backups"),
+        )
+        backups = os.listdir(os.path.join(self.manager_dir, "backups"))
+        assert len(backups) == 1
+        assert "a.md" in backups[0]
+
+
+class TestMoveMemories:
+    def setup_method(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.src_dir = os.path.join(self.tmpdir, "src", "memory")
+        self.dst_dir = os.path.join(self.tmpdir, "dst", "memory")
+        self.manager_dir = os.path.join(self.tmpdir, "manager")
+        os.makedirs(self.src_dir)
+        os.makedirs(self.dst_dir)
+
+    def teardown_method(self):
+        shutil.rmtree(self.tmpdir)
+
+    def test_move_transfers_file_and_index(self):
+        with open(os.path.join(self.src_dir, "a.md"), "w") as f:
+            f.write("content a")
+        with open(os.path.join(self.src_dir, "MEMORY.md"), "w") as f:
+            f.write("- [a.md](a.md) — desc a\n")
+        with open(os.path.join(self.dst_dir, "MEMORY.md"), "w") as f:
+            f.write("")
+        from memory_ops import move_memories
+        move_memories(
+            self.src_dir, self.dst_dir, ["a.md"],
+            log_file=os.path.join(self.manager_dir, "logs", "ops.jsonl"),
+        )
+        assert not os.path.exists(os.path.join(self.src_dir, "a.md"))
+        assert os.path.exists(os.path.join(self.dst_dir, "a.md"))
+        with open(os.path.join(self.dst_dir, "MEMORY.md")) as f:
+            assert "a.md" in f.read()
+
+    def test_move_conflict_raises(self):
+        with open(os.path.join(self.src_dir, "a.md"), "w") as f:
+            f.write("src")
+        with open(os.path.join(self.dst_dir, "a.md"), "w") as f:
+            f.write("dst already exists")
+        with open(os.path.join(self.src_dir, "MEMORY.md"), "w") as f:
+            f.write("- [a.md](a.md) — desc\n")
+        with open(os.path.join(self.dst_dir, "MEMORY.md"), "w") as f:
+            f.write("")
+        from memory_ops import move_memories
+        with pytest.raises(FileExistsError):
+            move_memories(
+                self.src_dir, self.dst_dir, ["a.md"],
+                log_file=os.path.join(self.manager_dir, "logs", "ops.jsonl"),
+            )
