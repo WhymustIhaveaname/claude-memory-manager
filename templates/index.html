@@ -267,7 +267,7 @@ body {
 .folder.active .count { color: var(--accent-text); background: var(--accent-glow); }
 
 /* ═══════════════ MIDDLE PANEL — MEMORY LIST ═══════════════ */
-.memories { flex: 1; min-width: 200px; }
+.memories { flex: 1; min-width: 0; }
 .memory-list { flex: 1; overflow-y: auto; }
 .memory-list table { width: 100%; border-collapse: collapse; }
 .memory-list th {
@@ -429,7 +429,7 @@ body {
 }
 
 /* ═══════════════ RIGHT PANEL — PREVIEW ═══════════════ */
-.preview { width: 38%; flex-shrink: 0; min-width: 200px; }
+.preview { flex: 1; min-width: 0; }
 .preview-header {
   padding: 12px 16px;
   border-bottom: 1px solid var(--border);
@@ -590,9 +590,29 @@ function toggleTheme() {
 })();
 
 /* ═══════════════ RESIZABLE PANELS ═══════════════ */
+const foldersPanel = document.getElementById('foldersPanel');
+const memoriesPanel = document.querySelector('.memories');
+const previewPanel = document.getElementById('preview');
+const MIN_W = 140;
+
+// Initialize all panels to fixed pixel widths on load
+function initPanelWidths() {
+  const fw = foldersPanel.getBoundingClientRect().width;
+  const mw = memoriesPanel.getBoundingClientRect().width;
+  const pw = previewPanel.getBoundingClientRect().width;
+  foldersPanel.style.flex = 'none';
+  foldersPanel.style.width = fw + 'px';
+  memoriesPanel.style.flex = 'none';
+  memoriesPanel.style.width = mw + 'px';
+  previewPanel.style.flex = 'none';
+  previewPanel.style.width = pw + 'px';
+}
+// Defer until layout is stable
+requestAnimationFrame(initPanelWidths);
+
 function initResize(handleId, leftEl, rightEl) {
   const handle = document.getElementById(handleId);
-  let startX, startLeftW, startRightW;
+  let startX, startLeftW, startRightW, totalW;
 
   handle.addEventListener('mousedown', (e) => {
     e.preventDefault();
@@ -602,15 +622,14 @@ function initResize(handleId, leftEl, rightEl) {
     startX = e.clientX;
     startLeftW = leftEl.getBoundingClientRect().width;
     startRightW = rightEl.getBoundingClientRect().width;
+    totalW = startLeftW + startRightW;
 
     function onMove(e) {
       let dx = e.clientX - startX;
-      dx = Math.max(dx, 160 - startLeftW);
-      dx = Math.min(dx, startRightW - 160);
-      leftEl.style.width = (startLeftW + dx) + 'px';
-      leftEl.style.flex = 'none';
-      rightEl.style.width = (startRightW - dx) + 'px';
-      rightEl.style.flex = 'none';
+      let newLeft = startLeftW + dx;
+      newLeft = Math.max(MIN_W, Math.min(newLeft, totalW - MIN_W));
+      leftEl.style.width = newLeft + 'px';
+      rightEl.style.width = (totalW - newLeft) + 'px';
     }
     function onUp() {
       handle.classList.remove('dragging');
@@ -623,10 +642,6 @@ function initResize(handleId, leftEl, rightEl) {
     document.addEventListener('mouseup', onUp);
   });
 }
-
-const foldersPanel = document.getElementById('foldersPanel');
-const memoriesPanel = document.querySelector('.memories');
-const previewPanel = document.getElementById('preview');
 
 initResize('resizeLeft', foldersPanel, memoriesPanel);
 initResize('resizeRight', memoriesPanel, previewPanel);
