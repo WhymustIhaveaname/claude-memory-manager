@@ -1,2 +1,371 @@
 <!DOCTYPE html>
-<html><body><h1>Claude Memory Manager</h1><p>Placeholder</p></body></html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Claude Memory Manager</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; height: 100vh; display: flex; flex-direction: column; background: #f5f5f5; color: #333; }
+.main { display: flex; flex: 1; overflow: hidden; }
+/* Left panel */
+.folders { width: 220px; border-right: 1px solid #ddd; background: #fafafa; overflow-y: auto; padding: 8px 0; }
+.folder { padding: 8px 12px; cursor: pointer; font-size: 13px; border-left: 3px solid transparent; }
+.folder:hover { background: #eee; }
+.folder.active { background: #e3f2fd; border-left-color: #1976d2; font-weight: 600; }
+.folder.dragover { background: #c8e6c9; border-left-color: #388e3c; }
+.folder .count { color: #888; font-size: 12px; margin-left: 4px; }
+/* Middle panel */
+.memories { flex: 1; display: flex; flex-direction: column; border-right: 1px solid #ddd; background: #fff; }
+.memory-list { flex: 1; overflow-y: auto; }
+.memory-list table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.memory-list th { background: #f5f5f5; text-align: left; padding: 6px 8px; border-bottom: 2px solid #ddd; position: sticky; top: 0; }
+.memory-list td { padding: 6px 8px; border-bottom: 1px solid #eee; cursor: pointer; }
+.memory-list tr:hover { background: #f0f7ff; }
+.memory-list tr.selected { background: #e3f2fd; }
+.memory-list tr[draggable="true"] { cursor: grab; }
+.badge { display: inline-block; font-size: 10px; padding: 1px 5px; border-radius: 3px; color: #fff; margin-left: 4px; }
+.badge.orphan { background: #e53935; }
+.badge.unindexed { background: #fb8c00; }
+.type-tag { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 3px; background: #e0e0e0; }
+.type-tag.user { background: #bbdefb; }
+.type-tag.feedback { background: #c8e6c9; }
+.type-tag.project { background: #fff9c4; }
+.type-tag.reference { background: #e1bee7; }
+.toolbar { padding: 8px; border-top: 1px solid #ddd; background: #fafafa; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.toolbar button, .toolbar select { font-size: 12px; padding: 4px 10px; border: 1px solid #ccc; border-radius: 3px; background: #fff; cursor: pointer; }
+.toolbar button:hover { background: #eee; }
+.toolbar button.danger { color: #c62828; border-color: #c62828; }
+.toolbar button.danger:hover { background: #ffebee; }
+.desc-edit { border: 1px solid #1976d2; padding: 2px 4px; font-size: 13px; width: 100%; }
+/* Right panel */
+.preview { flex: 1; display: flex; flex-direction: column; background: #fff; }
+.preview-header { padding: 8px 12px; border-bottom: 1px solid #ddd; background: #fafafa; display: flex; justify-content: space-between; align-items: center; }
+.preview-header .filename { font-weight: 600; font-size: 14px; }
+.preview-header button { font-size: 12px; padding: 4px 10px; border: 1px solid #ccc; border-radius: 3px; background: #fff; cursor: pointer; margin-left: 4px; }
+.preview-header button:hover { background: #eee; }
+.preview-body { flex: 1; overflow-y: auto; padding: 12px; }
+.preview-body pre { white-space: pre-wrap; word-wrap: break-word; font-size: 13px; line-height: 1.5; }
+.preview-body textarea { width: 100%; height: 100%; font-family: monospace; font-size: 13px; line-height: 1.5; border: 1px solid #ccc; padding: 8px; resize: none; }
+.empty-state { color: #999; text-align: center; padding: 40px; font-size: 14px; }
+/* Status bar */
+.status-bar { padding: 6px 12px; border-top: 1px solid #ddd; background: #fafafa; font-size: 12px; color: #555; min-height: 28px; }
+.status-bar.success { color: #2e7d32; }
+.status-bar.error { color: #c62828; }
+</style>
+</head>
+<body>
+
+<div class="main">
+  <div class="folders" id="folders"></div>
+  <div class="memories">
+    <div class="memory-list" id="memoryList">
+      <div class="empty-state">Select a folder</div>
+    </div>
+    <div class="toolbar">
+      <select id="moveTarget"><option value="">Move to...</option></select>
+      <button onclick="doMove()">Move</button>
+      <button class="danger" onclick="doDelete()">Delete</button>
+      <button onclick="doExport()">Export</button>
+      <label style="font-size:12px;cursor:pointer;padding:4px 10px;border:1px solid #ccc;border-radius:3px;background:#fff;">
+        Import <input type="file" accept=".zip" onchange="doImport(this)" style="display:none;">
+      </label>
+    </div>
+  </div>
+  <div class="preview" id="preview">
+    <div class="empty-state">Select a memory to preview</div>
+  </div>
+</div>
+<div class="status-bar" id="statusBar"></div>
+
+<script>
+let containers = [];
+let currentContainer = null;
+let currentMemories = [];
+let previewFile = null;
+let previewContent = null;
+let editing = false;
+
+async function api(url, opts = {}) {
+  const resp = await fetch(url, opts);
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ error: resp.statusText }));
+    throw new Error(err.error || resp.statusText);
+  }
+  return resp;
+}
+
+function status(msg, type = '') {
+  const bar = document.getElementById('statusBar');
+  bar.textContent = msg;
+  bar.className = 'status-bar ' + type;
+  if (type) setTimeout(() => { bar.textContent = ''; bar.className = 'status-bar'; }, 5000);
+}
+
+function getSelected() {
+  return [...document.querySelectorAll('.mem-check:checked')].map(cb => cb.dataset.file);
+}
+
+// --- Folders ---
+async function loadContainers() {
+  const resp = await api('/api/containers');
+  containers = await resp.json();
+  renderFolders();
+  updateMoveDropdown();
+}
+
+function renderFolders() {
+  const el = document.getElementById('folders');
+  el.innerHTML = containers.map(c => `
+    <div class="folder ${currentContainer && currentContainer.id === c.id ? 'active' : ''}"
+         data-id="${c.id}" onclick="selectFolder('${c.id}')"
+         ondragover="event.preventDefault(); this.classList.add('dragover')"
+         ondragleave="this.classList.remove('dragover')"
+         ondrop="dropOnFolder(event, '${c.id}')">
+      ${c.name} <span class="count">(${c.count})</span>
+    </div>
+  `).join('');
+}
+
+function updateMoveDropdown() {
+  const sel = document.getElementById('moveTarget');
+  sel.innerHTML = '<option value="">Move to...</option>' +
+    containers.filter(c => !currentContainer || c.id !== currentContainer.id)
+      .map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+}
+
+async function selectFolder(id) {
+  currentContainer = containers.find(c => c.id === id);
+  renderFolders();
+  updateMoveDropdown();
+  await loadMemories();
+  previewFile = null;
+  previewContent = null;
+  editing = false;
+  document.getElementById('preview').innerHTML = '<div class="empty-state">Select a memory to preview</div>';
+}
+
+// --- Memories ---
+async function loadMemories() {
+  if (!currentContainer) return;
+  const resp = await api(`/api/memories/${currentContainer.id}`);
+  currentMemories = await resp.json();
+  renderMemories();
+}
+
+function renderMemories() {
+  const el = document.getElementById('memoryList');
+  if (currentMemories.length === 0) {
+    el.innerHTML = '<div class="empty-state">No memories in this folder</div>';
+    return;
+  }
+  el.innerHTML = `<table>
+    <thead><tr><th style="width:30px"><input type="checkbox" onchange="toggleAll(this)"></th><th>Name</th><th>Type</th><th>Description</th></tr></thead>
+    <tbody>${currentMemories.map(m => `
+      <tr draggable="true" data-file="${m.filename}"
+          onclick="selectMemory('${m.filename}', event)"
+          ondragstart="dragStart(event, '${m.filename}')">
+        <td><input type="checkbox" class="mem-check" data-file="${m.filename}" onclick="event.stopPropagation()"></td>
+        <td>${m.name}${m.status !== 'ok' ? ` <span class="badge ${m.status}">${m.status}</span>` : ''}</td>
+        <td><span class="type-tag ${m.type}">${m.type}</span></td>
+        <td ondblclick="editIndexInline(this, '${m.filename}', event)">${m.description || ''}</td>
+      </tr>
+    `).join('')}</tbody>
+  </table>`;
+}
+
+function toggleAll(master) {
+  document.querySelectorAll('.mem-check').forEach(cb => cb.checked = master.checked);
+}
+
+async function selectMemory(filename, event) {
+  if (event && (event.target.tagName === 'INPUT' || event.target.classList.contains('desc-edit'))) return;
+  previewFile = filename;
+  const resp = await api(`/api/memory/${currentContainer.id}/${filename}`);
+  const data = await resp.json();
+  previewContent = data.content;
+  editing = false;
+  renderPreview();
+}
+
+// --- Preview / Edit ---
+function renderPreview() {
+  const el = document.getElementById('preview');
+  if (!previewFile) {
+    el.innerHTML = '<div class="empty-state">Select a memory to preview</div>';
+    return;
+  }
+  if (editing) {
+    el.innerHTML = `
+      <div class="preview-header">
+        <span class="filename">${previewFile}</span>
+        <div><button onclick="saveEdit()">Save</button><button onclick="cancelEdit()">Cancel</button></div>
+      </div>
+      <div class="preview-body"><textarea id="editArea">${previewContent.replace(/</g, '&lt;')}</textarea></div>`;
+  } else {
+    el.innerHTML = `
+      <div class="preview-header">
+        <span class="filename">${previewFile}</span>
+        <button onclick="startEdit()">Edit</button>
+      </div>
+      <div class="preview-body"><pre>${previewContent.replace(/</g, '&lt;')}</pre></div>`;
+  }
+}
+
+function startEdit() { editing = true; renderPreview(); }
+function cancelEdit() { editing = false; renderPreview(); }
+
+async function saveEdit() {
+  const newContent = document.getElementById('editArea').value;
+  try {
+    await api(`/api/memory/${currentContainer.id}/${previewFile}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ old_content: previewContent, new_content: newContent }),
+    });
+    previewContent = newContent;
+    editing = false;
+    renderPreview();
+    status('Saved', 'success');
+  } catch (e) { status(e.message, 'error'); }
+}
+
+// --- Inline index edit ---
+function editIndexInline(td, filename, event) {
+  event.stopPropagation();
+  const mem = currentMemories.find(m => m.filename === filename);
+  if (!mem || !mem.index_line) return;
+  const oldLine = mem.index_line;
+  const input = document.createElement('input');
+  input.className = 'desc-edit';
+  input.value = oldLine;
+  td.textContent = '';
+  td.appendChild(input);
+  input.focus();
+  input.select();
+
+  async function save() {
+    const newLine = input.value;
+    if (newLine === oldLine) { loadMemories(); return; }
+    try {
+      await api(`/api/index/${currentContainer.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ old_line: oldLine, new_line: newLine }),
+      });
+      status('Index updated', 'success');
+      await loadMemories();
+      await loadContainers();
+    } catch (e) { status(e.message, 'error'); loadMemories(); }
+  }
+  input.onblur = save;
+  input.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } if (e.key === 'Escape') { loadMemories(); } };
+}
+
+// --- Operations ---
+async function doMove() {
+  const files = getSelected();
+  const target = document.getElementById('moveTarget').value;
+  if (!files.length) { status('Select memories first', 'error'); return; }
+  if (!target) { status('Select a target folder', 'error'); return; }
+  try {
+    await api('/api/move', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files, from: currentContainer.id, to: target }),
+    });
+    status(`Moved ${files.length} item(s)`, 'success');
+    await loadContainers();
+    await loadMemories();
+  } catch (e) { status(e.message, 'error'); }
+}
+
+async function doDelete() {
+  const files = getSelected();
+  if (!files.length) { status('Select memories first', 'error'); return; }
+  if (!confirm(`Delete ${files.length} memory file(s)?`)) return;
+  try {
+    await api('/api/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files, container: currentContainer.id }),
+    });
+    status(`Deleted ${files.length} item(s)`, 'success');
+    await loadContainers();
+    await loadMemories();
+    if (files.includes(previewFile)) {
+      previewFile = null; previewContent = null; renderPreview();
+    }
+  } catch (e) { status(e.message, 'error'); }
+}
+
+async function doExport() {
+  const files = getSelected();
+  if (!files.length) { status('Select memories first', 'error'); return; }
+  try {
+    const resp = await fetch('/api/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files, container: currentContainer.id }),
+    });
+    if (!resp.ok) { const e = await resp.json(); throw new Error(e.error); }
+    const blob = await resp.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'claude-memory-export.zip';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    status('Exported', 'success');
+  } catch (e) { status(e.message, 'error'); }
+}
+
+async function doImport(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (!currentContainer) { status('Select a target folder first', 'error'); return; }
+  const form = new FormData();
+  form.append('file', file);
+  form.append('container', currentContainer.id);
+  try {
+    await api('/api/import', { method: 'POST', body: form });
+    status('Imported', 'success');
+    await loadContainers();
+    await loadMemories();
+  } catch (e) { status(e.message, 'error'); }
+  input.value = '';
+}
+
+// --- Drag and drop ---
+function dragStart(event, filename) {
+  let files = getSelected();
+  if (!files.includes(filename)) files = [filename];
+  event.dataTransfer.setData('application/json', JSON.stringify({
+    files, from: currentContainer.id,
+  }));
+  event.dataTransfer.effectAllowed = 'move';
+  const n = files.length;
+  status(`Dragging ${n} item(s)...`);
+}
+
+async function dropOnFolder(event, targetId) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('dragover');
+  const data = JSON.parse(event.dataTransfer.getData('application/json'));
+  if (data.from === targetId) return;
+  try {
+    await api('/api/move', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files: data.files, from: data.from, to: targetId }),
+    });
+    const target = containers.find(c => c.id === targetId);
+    status(`Moved ${data.files.length} item(s) to ${target ? target.name : targetId}`, 'success');
+    await loadContainers();
+    if (currentContainer && currentContainer.id === data.from) await loadMemories();
+  } catch (e) { status(e.message, 'error'); }
+}
+
+// --- Init ---
+loadContainers();
+</script>
+</body>
+</html>
