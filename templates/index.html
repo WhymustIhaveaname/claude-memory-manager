@@ -208,7 +208,7 @@ body {
 }
 
 /* ═══════════════ LEFT PANEL — FOLDERS ═══════════════ */
-.folders { width: 230px; }
+.folders { width: 230px; min-width: 140px; }
 .folders-header {
   padding: 14px 16px 10px;
   font-size: 11px;
@@ -267,7 +267,7 @@ body {
 .folder.active .count { color: var(--accent-text); background: var(--accent-glow); }
 
 /* ═══════════════ MIDDLE PANEL — MEMORY LIST ═══════════════ */
-.memories { flex: 1; min-width: 0; }
+.memories { flex: 1; min-width: 200px; }
 .memory-list { flex: 1; overflow-y: auto; }
 .memory-list table { width: 100%; border-collapse: collapse; }
 .memory-list th {
@@ -429,7 +429,7 @@ body {
 }
 
 /* ═══════════════ RIGHT PANEL — PREVIEW ═══════════════ */
-.preview { flex: 1; min-width: 0; }
+.preview { flex: 1; min-width: 200px; }
 .preview-header {
   padding: 12px 16px;
   border-bottom: 1px solid var(--border);
