@@ -195,6 +195,45 @@ def move_memories(src_dir, dst_dir, filenames, from_id="", to_id="", log_file=No
     _append_index_lines(dst_dir, lines_to_add)
 
 
+def export_memories(memory_dir, filenames, container_id="", log_file=None):
+    index = _parse_index(memory_dir)
+    buf = io.BytesIO()
+    manifest = []
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for fname in filenames:
+            filepath = os.path.join(memory_dir, fname)
+            if os.path.exists(filepath):
+                zf.write(filepath, fname)
+                manifest.append({
+                    "file": fname,
+                    "index_line": index.get(fname, f"- [{fname}]({fname}) — "),
+                    "target": memory_dir.replace(str(Path.home()), "~"),
+                })
+        zf.writestr("manifest.json", json.dumps(manifest, indent=2, ensure_ascii=False))
+    _write_log({"action": "export", "container": container_id, "files": filenames}, log_file=log_file)
+    return buf.getvalue()
+
+
+def import_memories(memory_dir, zip_bytes, container_id="", log_file=None):
+    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+        manifest = json.loads(zf.read("manifest.json"))
+        for entry in manifest:
+            dst_path = os.path.join(memory_dir, entry["file"])
+            if os.path.exists(dst_path):
+                raise FileExistsError(f"File already exists: {entry['file']}")
+        lines_to_add = []
+        imported_files = []
+        for entry in manifest:
+            fname = entry["file"]
+            dst_path = os.path.join(memory_dir, fname)
+            with open(dst_path, "wb") as f:
+                f.write(zf.read(fname))
+            lines_to_add.append(entry["index_line"])
+            imported_files.append(fname)
+        _append_index_lines(memory_dir, lines_to_add)
+    _write_log({"action": "import", "container": container_id, "files": imported_files, "source_zip": "upload"}, log_file=log_file)
+
+
 def list_containers(global_dir=None, projects_dir=None):
     if global_dir is None:
         global_dir = str(GLOBAL_MEMORY_DIR)

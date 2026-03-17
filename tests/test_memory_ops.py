@@ -210,3 +210,81 @@ class TestMoveMemories:
                 self.src_dir, self.dst_dir, ["a.md"],
                 log_file=os.path.join(self.manager_dir, "logs", "ops.jsonl"),
             )
+
+
+class TestExportMemories:
+    def setup_method(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.memory_dir = os.path.join(self.tmpdir, "memory")
+        self.manager_dir = os.path.join(self.tmpdir, "manager")
+        os.makedirs(self.memory_dir)
+
+    def teardown_method(self):
+        shutil.rmtree(self.tmpdir)
+
+    def test_export_creates_zip_with_manifest(self):
+        with open(os.path.join(self.memory_dir, "a.md"), "w") as f:
+            f.write("content a")
+        with open(os.path.join(self.memory_dir, "MEMORY.md"), "w") as f:
+            f.write("- [a.md](a.md) — desc a\n")
+        from memory_ops import export_memories
+        zip_bytes = export_memories(
+            self.memory_dir, ["a.md"],
+            log_file=os.path.join(self.manager_dir, "logs", "ops.jsonl"),
+        )
+        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+            assert "a.md" in zf.namelist()
+            assert "manifest.json" in zf.namelist()
+            manifest = json.loads(zf.read("manifest.json"))
+            assert manifest[0]["file"] == "a.md"
+            assert "index_line" in manifest[0]
+            assert "target" in manifest[0]
+
+
+class TestImportMemories:
+    def setup_method(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.memory_dir = os.path.join(self.tmpdir, "memory")
+        self.manager_dir = os.path.join(self.tmpdir, "manager")
+        os.makedirs(self.memory_dir)
+        with open(os.path.join(self.memory_dir, "MEMORY.md"), "w") as f:
+            f.write("")
+
+    def teardown_method(self):
+        shutil.rmtree(self.tmpdir)
+
+    def _make_zip(self, files, manifest):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            for name, content in files.items():
+                zf.writestr(name, content)
+            zf.writestr("manifest.json", json.dumps(manifest))
+        return buf.getvalue()
+
+    def test_import_adds_files_and_index(self):
+        zip_bytes = self._make_zip(
+            {"new.md": "---\nname: new\ntype: feedback\n---\nBody"},
+            [{"file": "new.md", "index_line": "- [new.md](new.md) — new entry", "target": "/tmp"}],
+        )
+        from memory_ops import import_memories
+        import_memories(
+            self.memory_dir, zip_bytes,
+            log_file=os.path.join(self.manager_dir, "logs", "ops.jsonl"),
+        )
+        assert os.path.exists(os.path.join(self.memory_dir, "new.md"))
+        with open(os.path.join(self.memory_dir, "MEMORY.md")) as f:
+            assert "new.md" in f.read()
+
+    def test_import_conflict_raises(self):
+        with open(os.path.join(self.memory_dir, "exist.md"), "w") as f:
+            f.write("already here")
+        zip_bytes = self._make_zip(
+            {"exist.md": "new content"},
+            [{"file": "exist.md", "index_line": "- [exist.md](exist.md) — x", "target": "/tmp"}],
+        )
+        from memory_ops import import_memories
+        with pytest.raises(FileExistsError):
+            import_memories(
+                self.memory_dir, zip_bytes,
+                log_file=os.path.join(self.manager_dir, "logs", "ops.jsonl"),
+            )
