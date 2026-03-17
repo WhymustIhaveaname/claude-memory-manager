@@ -1,83 +1,640 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <title>Claude Memory Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
+/* ═══════════════ THEME VARIABLES ═══════════════ */
+:root {
+  --font-ui: 'Outfit', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --radius-s: 6px;
+  --radius-m: 10px;
+  --radius-l: 14px;
+  --transition: 180ms cubic-bezier(.4,0,.2,1);
+  --shadow-s: 0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.08);
+  --shadow-m: 0 4px 16px rgba(0,0,0,.15), 0 2px 6px rgba(0,0,0,.1);
+  --shadow-l: 0 12px 40px rgba(0,0,0,.2), 0 4px 12px rgba(0,0,0,.12);
+}
+
+[data-theme="dark"] {
+  --bg-root: #0e1117;
+  --bg-panel: #161b22;
+  --bg-surface: #1c2129;
+  --bg-hover: #252c36;
+  --bg-active: #1a2744;
+  --border: #2a3140;
+  --border-focus: #58a6ff;
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted: #545d68;
+  --accent: #58a6ff;
+  --accent-glow: rgba(88,166,255,.15);
+  --accent-text: #58a6ff;
+  --danger: #f85149;
+  --danger-bg: rgba(248,81,73,.1);
+  --success: #3fb950;
+  --success-bg: rgba(63,185,80,.1);
+  --tag-user: #388bfd;
+  --tag-user-bg: rgba(56,139,253,.15);
+  --tag-feedback: #3fb950;
+  --tag-feedback-bg: rgba(63,185,80,.12);
+  --tag-project: #d29922;
+  --tag-project-bg: rgba(210,153,34,.12);
+  --tag-reference: #bc8cff;
+  --tag-reference-bg: rgba(188,140,255,.12);
+  --badge-orphan: #f85149;
+  --badge-unindexed: #d29922;
+  --resize-handle: #2a3140;
+  --resize-handle-hover: #58a6ff;
+  --scrollbar-thumb: #2a3140;
+  --scrollbar-hover: #3a4250;
+}
+
+[data-theme="light"] {
+  --bg-root: #f0f2f5;
+  --bg-panel: #ffffff;
+  --bg-surface: #f6f8fa;
+  --bg-hover: #eef1f5;
+  --bg-active: #dce8f8;
+  --border: #d8dee4;
+  --border-focus: #0969da;
+  --text-primary: #1f2328;
+  --text-secondary: #656d76;
+  --text-muted: #a0a8b2;
+  --accent: #0969da;
+  --accent-glow: rgba(9,105,218,.1);
+  --accent-text: #0969da;
+  --danger: #cf222e;
+  --danger-bg: rgba(207,34,46,.06);
+  --success: #1a7f37;
+  --success-bg: rgba(26,127,55,.08);
+  --tag-user: #0969da;
+  --tag-user-bg: rgba(9,105,218,.1);
+  --tag-feedback: #1a7f37;
+  --tag-feedback-bg: rgba(26,127,55,.08);
+  --tag-project: #9a6700;
+  --tag-project-bg: rgba(154,103,0,.08);
+  --tag-reference: #8250df;
+  --tag-reference-bg: rgba(130,80,223,.08);
+  --badge-orphan: #cf222e;
+  --badge-unindexed: #9a6700;
+  --resize-handle: #d8dee4;
+  --resize-handle-hover: #0969da;
+  --scrollbar-thumb: #d8dee4;
+  --scrollbar-hover: #b8bfc7;
+}
+
+/* ═══════════════ BASE ═══════════════ */
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; height: 100vh; display: flex; flex-direction: column; background: #f5f5f5; color: #333; }
-.main { display: flex; flex: 1; overflow: hidden; }
-/* Left panel */
-.folders { width: 220px; border-right: 1px solid #ddd; background: #fafafa; overflow-y: auto; padding: 8px 0; }
-.folder { padding: 8px 12px; cursor: pointer; font-size: 13px; border-left: 3px solid transparent; }
-.folder:hover { background: #eee; }
-.folder.active { background: #e3f2fd; border-left-color: #1976d2; font-weight: 600; }
-.folder.dragover { background: #c8e6c9; border-left-color: #388e3c; }
-.folder .count { color: #888; font-size: 12px; margin-left: 4px; }
-/* Middle panel */
-.memories { flex: 1; display: flex; flex-direction: column; border-right: 1px solid #ddd; background: #fff; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: var(--font-ui);
+  background: var(--bg-root);
+  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
+
+/* ═══════════════ HEADER ═══════════════ */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  height: 48px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.logo {
+  width: 22px; height: 22px;
+  background: linear-gradient(135deg, var(--accent), #a371f7);
+  border-radius: var(--radius-s);
+  display: flex; align-items: center; justify-content: center;
+}
+.logo svg { width: 14px; height: 14px; fill: #fff; }
+.header-title {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+}
+.header-right { display: flex; align-items: center; gap: 8px; }
+
+.theme-toggle {
+  width: 34px; height: 20px;
+  border-radius: 10px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  position: relative;
+  transition: var(--transition);
+}
+.theme-toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  transition: var(--transition);
+}
+[data-theme="light"] .theme-toggle::after {
+  transform: translateX(14px);
+  background: var(--accent);
+}
+.theme-label { font-size: 11px; color: var(--text-muted); font-weight: 500; }
+
+/* ═══════════════ MAIN LAYOUT ═══════════════ */
+.main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  padding: 8px;
+  gap: 0;
+}
+
+/* ═══════════════ PANELS ═══════════════ */
+.panel {
+  background: var(--bg-panel);
+  border-radius: var(--radius-l);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-s);
+  transition: box-shadow var(--transition);
+  min-width: 0;
+}
+
+/* ═══════════════ RESIZE HANDLES ═══════════════ */
+.resize-handle {
+  width: 8px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 5;
+}
+.resize-handle::after {
+  content: '';
+  width: 2px;
+  height: 32px;
+  border-radius: 1px;
+  background: var(--resize-handle);
+  transition: var(--transition);
+}
+.resize-handle:hover::after,
+.resize-handle.dragging::after {
+  background: var(--resize-handle-hover);
+  height: 48px;
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+/* ═══════════════ LEFT PANEL — FOLDERS ═══════════════ */
+.folders { width: 230px; }
+.folders-header {
+  padding: 14px 16px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+}
+.folders-list { flex: 1; overflow-y: auto; padding: 0 6px 8px; }
+.folder {
+  padding: 8px 12px;
+  border-radius: var(--radius-m);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  transition: all var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+  border: 1px solid transparent;
+}
+.folder:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.folder.active {
+  background: var(--bg-active);
+  color: var(--accent-text);
+  font-weight: 500;
+  border-color: rgba(88,166,255,.2);
+}
+.folder.dragover {
+  background: var(--success-bg);
+  border-color: var(--success);
+  color: var(--success);
+}
+.folder-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.folder-icon { margin-right: 8px; font-size: 15px; opacity: .7; flex-shrink: 0; }
+.folder .count {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  padding: 1px 7px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+.folder.active .count { color: var(--accent-text); background: var(--accent-glow); }
+
+/* ═══════════════ MIDDLE PANEL — MEMORY LIST ═══════════════ */
+.memories { flex: 1; }
 .memory-list { flex: 1; overflow-y: auto; }
-.memory-list table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.memory-list th { background: #f5f5f5; text-align: left; padding: 6px 8px; border-bottom: 2px solid #ddd; position: sticky; top: 0; }
-.memory-list td { padding: 6px 8px; border-bottom: 1px solid #eee; cursor: pointer; }
-.memory-list tr:hover { background: #f0f7ff; }
-.memory-list tr.selected { background: #e3f2fd; }
+.memory-list table { width: 100%; border-collapse: collapse; }
+.memory-list th {
+  background: var(--bg-surface);
+  text-align: left;
+  padding: 10px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  border-bottom: 1px solid var(--border);
+}
+.memory-list td {
+  padding: 10px 14px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background var(--transition);
+  color: var(--text-secondary);
+}
+.memory-list tr { transition: background var(--transition); }
+.memory-list tbody tr:hover { background: var(--bg-hover); }
+.memory-list tbody tr:hover td { color: var(--text-primary); }
+.memory-list tr.row-active td { color: var(--text-primary); background: var(--bg-active); }
 .memory-list tr[draggable="true"] { cursor: grab; }
-.badge { display: inline-block; font-size: 10px; padding: 1px 5px; border-radius: 3px; color: #fff; margin-left: 4px; }
-.badge.orphan { background: #e53935; }
-.badge.unindexed { background: #fb8c00; }
-.type-tag { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 3px; background: #e0e0e0; }
-.type-tag.user { background: #bbdefb; }
-.type-tag.feedback { background: #c8e6c9; }
-.type-tag.project { background: #fff9c4; }
-.type-tag.reference { background: #e1bee7; }
-.toolbar { padding: 8px; border-top: 1px solid #ddd; background: #fafafa; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.toolbar button, .toolbar select { font-size: 12px; padding: 4px 10px; border: 1px solid #ccc; border-radius: 3px; background: #fff; cursor: pointer; }
-.toolbar button:hover { background: #eee; }
-.toolbar button.danger { color: #c62828; border-color: #c62828; }
-.toolbar button.danger:hover { background: #ffebee; }
-.desc-edit { border: 1px solid #1976d2; padding: 2px 4px; font-size: 13px; width: 100%; }
-/* Right panel */
-.preview { flex: 1; display: flex; flex-direction: column; background: #fff; }
-.preview-header { padding: 8px 12px; border-bottom: 1px solid #ddd; background: #fafafa; display: flex; justify-content: space-between; align-items: center; }
-.preview-header .filename { font-weight: 600; font-size: 14px; }
-.preview-header button { font-size: 12px; padding: 4px 10px; border: 1px solid #ccc; border-radius: 3px; background: #fff; cursor: pointer; margin-left: 4px; }
-.preview-header button:hover { background: #eee; }
-.preview-body { flex: 1; overflow-y: auto; padding: 12px; }
-.preview-body pre { white-space: pre-wrap; word-wrap: break-word; font-size: 13px; line-height: 1.5; }
-.preview-body textarea { width: 100%; height: 100%; font-family: monospace; font-size: 13px; line-height: 1.5; border: 1px solid #ccc; padding: 8px; resize: none; }
-.empty-state { color: #999; text-align: center; padding: 40px; font-size: 14px; }
-/* Status bar */
-.status-bar { padding: 6px 12px; border-top: 1px solid #ddd; background: #fafafa; font-size: 12px; color: #555; min-height: 28px; }
-.status-bar.success { color: #2e7d32; }
-.status-bar.error { color: #c62828; }
+.memory-list tr[draggable="true"]:active { cursor: grabbing; }
+.mem-name { font-weight: 500; font-family: var(--font-mono); font-size: 12px; color: var(--text-primary); }
+
+/* Checkbox */
+.mem-check {
+  appearance: none;
+  width: 16px; height: 16px;
+  border: 1.5px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: var(--transition);
+  position: relative;
+  background: transparent;
+}
+.mem-check:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.mem-check:checked::after {
+  content: '';
+  position: absolute;
+  left: 4.5px; top: 1.5px;
+  width: 4px; height: 8px;
+  border: solid #fff; border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.mem-check:hover { border-color: var(--accent); }
+
+/* Type tags */
+.type-tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.2px;
+}
+.type-tag.user { color: var(--tag-user); background: var(--tag-user-bg); }
+.type-tag.feedback { color: var(--tag-feedback); background: var(--tag-feedback-bg); }
+.type-tag.project { color: var(--tag-project); background: var(--tag-project-bg); }
+.type-tag.reference { color: var(--tag-reference); background: var(--tag-reference-bg); }
+.type-tag.unknown { color: var(--text-muted); background: var(--bg-surface); }
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+.badge.orphan { color: var(--badge-orphan); background: var(--danger-bg); }
+.badge.unindexed { color: var(--badge-unindexed); background: var(--tag-project-bg); }
+
+/* Toolbar */
+.toolbar {
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-surface);
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  border-radius: 0 0 var(--radius-l) var(--radius-l);
+}
+.btn {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+  background: var(--bg-panel);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.btn:hover { background: var(--bg-hover); color: var(--text-primary); border-color: var(--text-muted); }
+.btn.danger { color: var(--danger); border-color: transparent; background: var(--danger-bg); }
+.btn.danger:hover { background: var(--danger); color: #fff; }
+.btn-import {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+  background: var(--bg-panel);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.btn-import:hover { background: var(--bg-hover); color: var(--text-primary); }
+.toolbar select {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+  background: var(--bg-panel);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition);
+  outline: none;
+}
+.toolbar select:hover { border-color: var(--text-muted); }
+.toolbar select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+
+/* Inline index edit */
+.desc-edit {
+  border: 1px solid var(--accent);
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  width: 100%;
+  border-radius: var(--radius-s);
+  background: var(--bg-root);
+  color: var(--text-primary);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+/* ═══════════════ RIGHT PANEL — PREVIEW ═══════════════ */
+.preview { flex: 1; }
+.preview-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-surface);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: var(--radius-l) var(--radius-l) 0 0;
+}
+.preview-header .filename {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--accent-text);
+}
+.preview-header .btn { font-size: 12px; }
+.preview-body { flex: 1; overflow-y: auto; padding: 16px; }
+.preview-body pre {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+.preview-body textarea {
+  width: 100%;
+  height: 100%;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.7;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  padding: 12px;
+  resize: none;
+  background: var(--bg-root);
+  color: var(--text-primary);
+  outline: none;
+  transition: border var(--transition);
+}
+.preview-body textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+/* ═══════════════ EMPTY STATE ═══════════════ */
+.empty-state {
+  color: var(--text-muted);
+  text-align: center;
+  padding: 60px 24px;
+  font-size: 13px;
+  font-weight: 400;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+  justify-content: center;
+}
+.empty-icon { font-size: 32px; opacity: .4; margin-bottom: 4px; }
+
+/* ═══════════════ STATUS BAR ═══════════════ */
+.status-bar {
+  padding: 6px 20px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted);
+  min-height: 30px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  transition: color var(--transition);
+}
+.status-bar.success { color: var(--success); }
+.status-bar.error { color: var(--danger); }
+
+/* ═══════════════ ANIMATIONS ═══════════════ */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.folder { animation: fadeIn .2s ease both; }
+.folder:nth-child(1) { animation-delay: .02s; }
+.folder:nth-child(2) { animation-delay: .04s; }
+.folder:nth-child(3) { animation-delay: .06s; }
+.folder:nth-child(4) { animation-delay: .08s; }
+.folder:nth-child(5) { animation-delay: .1s; }
+.folder:nth-child(6) { animation-delay: .12s; }
+.folder:nth-child(7) { animation-delay: .14s; }
+.folder:nth-child(8) { animation-delay: .16s; }
+.folder:nth-child(9) { animation-delay: .18s; }
+.folder:nth-child(10) { animation-delay: .2s; }
+
+.memory-list tbody tr { animation: fadeIn .15s ease both; }
+.memory-list tbody tr:nth-child(1) { animation-delay: .02s; }
+.memory-list tbody tr:nth-child(2) { animation-delay: .04s; }
+.memory-list tbody tr:nth-child(3) { animation-delay: .06s; }
+.memory-list tbody tr:nth-child(4) { animation-delay: .08s; }
+.memory-list tbody tr:nth-child(5) { animation-delay: .1s; }
+.memory-list tbody tr:nth-child(6) { animation-delay: .12s; }
+.memory-list tbody tr:nth-child(7) { animation-delay: .14s; }
+.memory-list tbody tr:nth-child(8) { animation-delay: .16s; }
+.memory-list tbody tr:nth-child(9) { animation-delay: .18s; }
+.memory-list tbody tr:nth-child(10) { animation-delay: .2s; }
 </style>
 </head>
 <body>
 
+<div class="header">
+  <div class="header-left">
+    <div class="logo"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg></div>
+    <span class="header-title">Claude Memory Manager</span>
+  </div>
+  <div class="header-right">
+    <span class="theme-label">Dark</span>
+    <div class="theme-toggle" onclick="toggleTheme()" title="Toggle theme"></div>
+    <span class="theme-label">Light</span>
+  </div>
+</div>
+
 <div class="main">
-  <div class="folders" id="folders"></div>
-  <div class="memories">
+  <div class="panel folders" id="foldersPanel">
+    <div class="folders-header">Containers</div>
+    <div class="folders-list" id="folders"></div>
+  </div>
+  <div class="resize-handle" id="resizeLeft"></div>
+  <div class="panel memories">
     <div class="memory-list" id="memoryList">
-      <div class="empty-state">Select a folder</div>
+      <div class="empty-state"><span class="empty-icon">&#128193;</span>Select a container</div>
     </div>
     <div class="toolbar">
       <select id="moveTarget"><option value="">Move to...</option></select>
-      <button onclick="doMove()">Move</button>
-      <button class="danger" onclick="doDelete()">Delete</button>
-      <button onclick="doExport()">Export</button>
-      <label style="font-size:12px;cursor:pointer;padding:4px 10px;border:1px solid #ccc;border-radius:3px;background:#fff;">
-        Import <input type="file" accept=".zip" onchange="doImport(this)" style="display:none;">
+      <button class="btn" onclick="doMove()">&#8618; Move</button>
+      <button class="btn danger" onclick="doDelete()">&#10005; Delete</button>
+      <button class="btn" onclick="doExport()">&#8615; Export</button>
+      <label class="btn-import">
+        &#8613; Import <input type="file" accept=".zip" onchange="doImport(this)" style="display:none;">
       </label>
     </div>
   </div>
-  <div class="preview" id="preview">
-    <div class="empty-state">Select a memory to preview</div>
+  <div class="resize-handle" id="resizeRight"></div>
+  <div class="panel preview" id="preview">
+    <div class="empty-state"><span class="empty-icon">&#128196;</span>Select a memory to preview</div>
   </div>
 </div>
 <div class="status-bar" id="statusBar"></div>
 
 <script>
+/* ═══════════════ THEME TOGGLE ═══════════════ */
+function toggleTheme() {
+  const html = document.documentElement;
+  html.dataset.theme = html.dataset.theme === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('theme', html.dataset.theme);
+}
+(function() {
+  const saved = localStorage.getItem('theme');
+  if (saved) document.documentElement.dataset.theme = saved;
+})();
+
+/* ═══════════════ RESIZABLE PANELS ═══════════════ */
+function initResize(handleId, getLeft, getRight, setLeft, setRight) {
+  const handle = document.getElementById(handleId);
+  let startX, startLeftW, startRightW;
+
+  handle.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    handle.classList.add('dragging');
+    startX = e.clientX;
+    startLeftW = getLeft().getBoundingClientRect().width;
+    startRightW = getRight().getBoundingClientRect().width;
+
+    function onMove(e) {
+      const dx = e.clientX - startX;
+      const newLeft = Math.max(160, startLeftW + dx);
+      const newRight = Math.max(160, startRightW - dx);
+      setLeft(newLeft);
+      setRight(newRight);
+    }
+    function onUp() {
+      handle.classList.remove('dragging');
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+}
+
+const foldersPanel = document.getElementById('foldersPanel');
+const previewPanel = document.getElementById('preview');
+
+initResize('resizeLeft',
+  () => foldersPanel,
+  () => foldersPanel.nextElementSibling.nextElementSibling,
+  (w) => foldersPanel.style.width = w + 'px',
+  () => {}
+);
+initResize('resizeRight',
+  () => previewPanel.previousElementSibling.previousElementSibling,
+  () => previewPanel,
+  () => {},
+  (w) => previewPanel.style.width = w + 'px'
+);
+
+/* ═══════════════ STATE ═══════════════ */
 let containers = [];
 let currentContainer = null;
 let currentMemories = [];
@@ -105,7 +662,7 @@ function getSelected() {
   return [...document.querySelectorAll('.mem-check:checked')].map(cb => cb.dataset.file);
 }
 
-// --- Folders ---
+/* ═══════════════ FOLDERS ═══════════════ */
 async function loadContainers() {
   const resp = await api('/api/containers');
   containers = await resp.json();
@@ -115,15 +672,19 @@ async function loadContainers() {
 
 function renderFolders() {
   const el = document.getElementById('folders');
-  el.innerHTML = containers.map(c => `
+  el.innerHTML = containers.map(c => {
+    const icon = c.id === 'global' ? '&#127760;' : '&#128194;';
+    return `
     <div class="folder ${currentContainer && currentContainer.id === c.id ? 'active' : ''}"
          data-id="${c.id}" onclick="selectFolder('${c.id}')"
          ondragover="event.preventDefault(); this.classList.add('dragover')"
          ondragleave="this.classList.remove('dragover')"
          ondrop="dropOnFolder(event, '${c.id}')">
-      ${c.name} <span class="count">(${c.count})</span>
-    </div>
-  `).join('');
+      <span class="folder-icon">${icon}</span>
+      <span class="folder-name">${c.name}</span>
+      <span class="count">${c.count}</span>
+    </div>`;
+  }).join('');
 }
 
 function updateMoveDropdown() {
@@ -141,10 +702,10 @@ async function selectFolder(id) {
   previewFile = null;
   previewContent = null;
   editing = false;
-  document.getElementById('preview').innerHTML = '<div class="empty-state">Select a memory to preview</div>';
+  document.getElementById('preview').innerHTML = '<div class="empty-state"><span class="empty-icon">&#128196;</span>Select a memory to preview</div>';
 }
 
-// --- Memories ---
+/* ═══════════════ MEMORIES ═══════════════ */
 async function loadMemories() {
   if (!currentContainer) return;
   const resp = await api(`/api/memories/${currentContainer.id}`);
@@ -155,31 +716,46 @@ async function loadMemories() {
 function renderMemories() {
   const el = document.getElementById('memoryList');
   if (currentMemories.length === 0) {
-    el.innerHTML = '<div class="empty-state">No memories in this folder</div>';
+    el.innerHTML = '<div class="empty-state"><span class="empty-icon">&#128173;</span>No memories here</div>';
     return;
   }
   el.innerHTML = `<table>
-    <thead><tr><th style="width:30px"><input type="checkbox" onchange="toggleAll(this)"></th><th>Name</th><th>Type</th><th>Description</th></tr></thead>
+    <thead><tr>
+      <th style="width:36px"><input type="checkbox" class="mem-check" onchange="toggleAll(this)"></th>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Description</th>
+    </tr></thead>
     <tbody>${currentMemories.map(m => `
-      <tr draggable="true" data-file="${m.filename}"
+      <tr draggable="true" data-file="${m.filename}" id="row-${m.filename}"
           onclick="selectMemory('${m.filename}', event)"
           ondragstart="dragStart(event, '${m.filename}')">
         <td><input type="checkbox" class="mem-check" data-file="${m.filename}" onclick="event.stopPropagation()"></td>
-        <td>${m.name}${m.status !== 'ok' ? ` <span class="badge ${m.status}">${m.status}</span>` : ''}</td>
+        <td><span class="mem-name">${m.name}</span>${m.status !== 'ok' ? `<span class="badge ${m.status}">${m.status}</span>` : ''}</td>
         <td><span class="type-tag ${m.type}">${m.type}</span></td>
-        <td ondblclick="editIndexInline(this, '${m.filename}', event)">${m.description || ''}</td>
+        <td ondblclick="editIndexInline(this, '${m.filename}', event)" style="color:var(--text-secondary);font-size:12px">${m.description || '<span style="color:var(--text-muted);font-style:italic">no description</span>'}</td>
       </tr>
     `).join('')}</tbody>
   </table>`;
+  highlightActiveRow();
+}
+
+function highlightActiveRow() {
+  document.querySelectorAll('.memory-list tbody tr').forEach(tr => tr.classList.remove('row-active'));
+  if (previewFile) {
+    const row = document.getElementById('row-' + previewFile);
+    if (row) row.classList.add('row-active');
+  }
 }
 
 function toggleAll(master) {
-  document.querySelectorAll('.mem-check').forEach(cb => cb.checked = master.checked);
+  document.querySelectorAll('.mem-check[data-file]').forEach(cb => cb.checked = master.checked);
 }
 
 async function selectMemory(filename, event) {
   if (event && (event.target.tagName === 'INPUT' || event.target.classList.contains('desc-edit'))) return;
   previewFile = filename;
+  highlightActiveRow();
   const resp = await api(`/api/memory/${currentContainer.id}/${filename}`);
   const data = await resp.json();
   previewContent = data.content;
@@ -187,27 +763,31 @@ async function selectMemory(filename, event) {
   renderPreview();
 }
 
-// --- Preview / Edit ---
+/* ═══════════════ PREVIEW / EDIT ═══════════════ */
 function renderPreview() {
   const el = document.getElementById('preview');
   if (!previewFile) {
-    el.innerHTML = '<div class="empty-state">Select a memory to preview</div>';
+    el.innerHTML = '<div class="empty-state"><span class="empty-icon">&#128196;</span>Select a memory to preview</div>';
     return;
   }
+  const escaped = previewContent.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   if (editing) {
     el.innerHTML = `
       <div class="preview-header">
         <span class="filename">${previewFile}</span>
-        <div><button onclick="saveEdit()">Save</button><button onclick="cancelEdit()">Cancel</button></div>
+        <div style="display:flex;gap:6px">
+          <button class="btn" onclick="saveEdit()" style="border-color:var(--success);color:var(--success)">&#10003; Save</button>
+          <button class="btn" onclick="cancelEdit()">Cancel</button>
+        </div>
       </div>
-      <div class="preview-body"><textarea id="editArea">${previewContent.replace(/</g, '&lt;')}</textarea></div>`;
+      <div class="preview-body"><textarea id="editArea">${escaped}</textarea></div>`;
   } else {
     el.innerHTML = `
       <div class="preview-header">
         <span class="filename">${previewFile}</span>
-        <button onclick="startEdit()">Edit</button>
+        <button class="btn" onclick="startEdit()">&#9998; Edit</button>
       </div>
-      <div class="preview-body"><pre>${previewContent.replace(/</g, '&lt;')}</pre></div>`;
+      <div class="preview-body"><pre>${escaped}</pre></div>`;
   }
 }
 
@@ -225,11 +805,11 @@ async function saveEdit() {
     previewContent = newContent;
     editing = false;
     renderPreview();
-    status('Saved', 'success');
+    status('Saved successfully', 'success');
   } catch (e) { status(e.message, 'error'); }
 }
 
-// --- Inline index edit ---
+/* ═══════════════ INLINE INDEX EDIT ═══════════════ */
 function editIndexInline(td, filename, event) {
   event.stopPropagation();
   const mem = currentMemories.find(m => m.filename === filename);
@@ -261,7 +841,7 @@ function editIndexInline(td, filename, event) {
   input.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } if (e.key === 'Escape') { loadMemories(); } };
 }
 
-// --- Operations ---
+/* ═══════════════ OPERATIONS ═══════════════ */
 async function doMove() {
   const files = getSelected();
   const target = document.getElementById('moveTarget').value;
@@ -292,9 +872,7 @@ async function doDelete() {
     status(`Deleted ${files.length} item(s)`, 'success');
     await loadContainers();
     await loadMemories();
-    if (files.includes(previewFile)) {
-      previewFile = null; previewContent = null; renderPreview();
-    }
+    if (files.includes(previewFile)) { previewFile = null; previewContent = null; renderPreview(); }
   } catch (e) { status(e.message, 'error'); }
 }
 
@@ -327,23 +905,20 @@ async function doImport(input) {
   form.append('container', currentContainer.id);
   try {
     await api('/api/import', { method: 'POST', body: form });
-    status('Imported', 'success');
+    status('Imported successfully', 'success');
     await loadContainers();
     await loadMemories();
   } catch (e) { status(e.message, 'error'); }
   input.value = '';
 }
 
-// --- Drag and drop ---
+/* ═══════════════ DRAG AND DROP ═══════════════ */
 function dragStart(event, filename) {
   let files = getSelected();
   if (!files.includes(filename)) files = [filename];
-  event.dataTransfer.setData('application/json', JSON.stringify({
-    files, from: currentContainer.id,
-  }));
+  event.dataTransfer.setData('application/json', JSON.stringify({ files, from: currentContainer.id }));
   event.dataTransfer.effectAllowed = 'move';
-  const n = files.length;
-  status(`Dragging ${n} item(s)...`);
+  status(`Dragging ${files.length} item(s)...`);
 }
 
 async function dropOnFolder(event, targetId) {
@@ -364,7 +939,7 @@ async function dropOnFolder(event, targetId) {
   } catch (e) { status(e.message, 'error'); }
 }
 
-// --- Init ---
+/* ═══════════════ INIT ═══════════════ */
 loadContainers();
 </script>
 </body>
