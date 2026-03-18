@@ -16,7 +16,7 @@ Claude Code 的 auto-memory 系统会为每个项目自动积累记忆文件（`
 - 通过 Claude Code Hook 在每次会话开始时自动注入全局记忆到上下文
 - 提供 Skill 让 Claude 在对话中直接增删全局记忆
 
-**Web 管理界面**（`localhost:5000`）：
+**Web 管理界面**（默认 `localhost:5050`，端口冲突时自动避让）：
 - 三栏布局（文件夹 / 记忆列表 / 预览编辑），统一管理全局和各项目的记忆文件
 - 编辑、移动、删除记忆，支持拖拽跨容器移动
 - 导出选中的记忆为 `.zip`，在另一台机器上导入
@@ -29,7 +29,7 @@ claude plugin install <this-repo>
 
 安装后：
 - 每次 Claude Code 会话启动时，全局记忆自动注入上下文
-- 管理界面自动在后台启动，访问 `http://localhost:5000`
+- 管理界面自动在后台启动（默认 `http://localhost:5050`，端口冲突时自动避让，实际端口会在终端输出）
 
 ## 文件架构
 
@@ -58,10 +58,10 @@ claude-memory-manager/
 - [x] Web UI：查看、编辑、移动、删除、导出、导入记忆
 - [x] 全局 + 各项目容器统一管理
 - [x] 所有写操作可逆（日志 + 备份）
-- [ ] 重写为 Claude Code plugin
-    - [ ] SessionStart Hook：自动注入全局记忆到每次会话上下文
-    - [ ] Skill：在对话中让 Claude 增删全局记忆
-    - [ ] Session 启动时自动启动 webui
+- [x] Claude Code Plugin：SessionStart Hook 自动注入记忆 + 启动 Web UI；manage-memory Skill
+    - [x] SessionStart Hook：自动注入全局记忆到每次会话上下文
+    - [x] Skill：在对话中让 Claude 增删全局记忆
+    - [x] Session 启动时自动启动 webui
 
 ## See Also
 

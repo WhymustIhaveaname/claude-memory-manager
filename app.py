@@ -1,9 +1,16 @@
 import os
+import sys
 import io
+import argparse
+
+# Resolve plugin root: CLAUDE_PLUGIN_ROOT env var, or the directory containing this script
+PLUGIN_ROOT = os.environ.get("CLAUDE_PLUGIN_ROOT", os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, PLUGIN_ROOT)
+
 from flask import Flask, request, jsonify, send_file, render_template
 import memory_ops
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder=os.path.join(PLUGIN_ROOT, "templates"))
 
 
 def _resolve_container(container_id):
@@ -122,4 +129,7 @@ def import_memories():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--port", type=int, default=5050)
+    args = parser.parse_args()
+    app.run(host="127.0.0.1", port=args.port)

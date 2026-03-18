@@ -5,3 +5,4 @@ __pycache__/
 CLAUDE.md
 claude-memory-export.zip
 claude-memory-export/
+.claude/

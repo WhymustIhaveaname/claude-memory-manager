@@ -1,0 +1,16 @@
+{
+  "name": "WhymustIhaveaname",
+  "owner": { "name": "WhymustIhaveaname" },
+  "metadata": {
+    "description": "Plugins by WhymustIhaveaname",
+    "homepage": "https://github.com/WhymustIhaveaname/claude-memory-manager"
+  },
+  "plugins": [
+    {
+      "name": "claude-memory-manager",
+      "version": "1.0.0",
+      "source": "./",
+      "description": "Global memory manager for Claude Code — auto-inject, edit, and organize memories with a visual web UI"
+    }
+  ]
+}
