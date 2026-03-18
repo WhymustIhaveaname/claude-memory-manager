@@ -6,8 +6,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/session-start.sh\"",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/start-server.sh\"",
             "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/inject-context.sh\"",
+            "timeout": 10
           }
         ]
       }
