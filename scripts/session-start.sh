@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
-# Hook 1: Install Flask + start web server + print visible summary
+# Single SessionStart hook: install deps, start server, inject context via JSON
 set -euo pipefail
 
 PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 
 # ---------- 0. Auto-sync marketplace → cache ----------
-# /plugin u updates marketplace but not cache; CLAUDE_PLUGIN_ROOT points to cache
 MARKETPLACE_DIR="$HOME/.claude/plugins/marketplaces/WhymustIhaveaname"
 if [ -d "$MARKETPLACE_DIR" ] && [ "$PLUGIN_ROOT" != "$MARKETPLACE_DIR" ]; then
-  # sync if marketplace hooks.json is newer than cache
   if [ "$MARKETPLACE_DIR/hooks/hooks.json" -nt "$PLUGIN_ROOT/hooks/hooks.json" ] 2>/dev/null; then
     rsync -a --delete --exclude='.git' --exclude='__pycache__' --exclude='.venv' --exclude='.pytest_cache' \
       "$MARKETPLACE_DIR/" "$PLUGIN_ROOT/"
@@ -25,7 +23,6 @@ mkdir -p "$STATE_DIR"
 
 # ---------- 1. Ensure Flask is installed ----------
 if ! python3 -c "import flask" 2>/dev/null; then
-  echo "[claude-memory-manager] Installing Flask..."
   if command -v uv >/dev/null 2>&1; then
     uv pip install flask --quiet 2>/dev/null || true
   else
@@ -69,21 +66,58 @@ if [ "$server_running" = false ]; then
   done
 fi
 
-# ---------- 3. Print visible summary (must match what we inject into context) ----------
-CLAUDE_DIR="$HOME/.claude"
-GLOBAL_INDEX="$CLAUDE_DIR/memory/MEMORY.md"
+# ---------- 3. Output JSON (both context injection AND terminal display) ----------
+python3 - "$PORT" <<'PYEOF'
+import os, sys, json
 
-echo ""
-echo "[claude-memory-manager] Injected global memories:"
-if [ -f "$GLOBAL_INDEX" ]; then
-  while IFS= read -r line; do
-    case "$line" in
-      "- ["*) echo "  $line" ;;
-    esac
-  done < "$GLOBAL_INDEX"
-else
-  echo "  (none)"
-fi
+port = sys.argv[1]
+home = os.path.expanduser("~")
+claude_dir = os.path.join(home, ".claude")
 
-echo ""
-echo "Manage memories @ http://localhost:${PORT}"
+def read_memory_index(path):
+    if not os.path.exists(path):
+        return []
+    entries = []
+    with open(path, "r") as f:
+        for line in f:
+            line = line.strip()
+            if line.startswith("- ["):
+                entries.append(line)
+    return entries
+
+global_entries = read_memory_index(os.path.join(claude_dir, "memory", "MEMORY.md"))
+
+# Terminal message (shown to user via systemMessage)
+msg_parts = []
+msg_parts.append("")
+msg_parts.append("[claude-memory-manager] Injected global memories:")
+if global_entries:
+    for entry in global_entries:
+        msg_parts.append(f"  {entry}")
+else:
+    msg_parts.append("  (none)")
+msg_parts.append("")
+msg_parts.append(f"Manage memories @ http://localhost:{port}")
+system_message = "\n".join(msg_parts)
+
+# Context for Claude (injected silently)
+inject_parts = []
+inject_parts.append("## Claude Memory Manager Plugin Active")
+inject_parts.append("")
+if global_entries:
+    inject_parts.append("### Global Memories (~/.claude/memory/)")
+    for entry in global_entries:
+        inject_parts.append(entry)
+    inject_parts.append("")
+inject_parts.append("You can directly read and edit memory files in ~/.claude/memory/ (global) and ~/.claude/projects/*/memory/ (per-project). Use the manage-memory skill for details.")
+context = "\n".join(inject_parts)
+
+output = {
+    "hookSpecificOutput": {
+        "hookEventName": "SessionStart",
+        "additionalContext": context
+    },
+    "systemMessage": system_message
+}
+print(json.dumps(output, ensure_ascii=False))
+PYEOF
