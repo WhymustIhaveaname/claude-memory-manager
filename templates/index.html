@@ -735,7 +735,6 @@ function renderMemories() {
     <thead><tr>
       <th style="width:36px"><input type="checkbox" class="mem-check" onchange="toggleAll(this)"></th>
       <th>Name</th>
-      <th>Type</th>
       <th>Description</th>
     </tr></thead>
     <tbody>${currentMemories.map(m => `
@@ -744,8 +743,7 @@ function renderMemories() {
           ondragstart="dragStart(event, '${m.filename}')">
         <td><input type="checkbox" class="mem-check" data-file="${m.filename}" onclick="event.stopPropagation()"></td>
         <td><span class="mem-name">${m.name}</span>${m.status !== 'ok' ? `<span class="badge ${m.status}">${m.status}</span>` : ''}</td>
-        <td><span class="type-tag ${m.type}">${m.type}</span></td>
-        <td ondblclick="editIndexInline(this, '${m.filename}', event)" style="color:var(--text-secondary);font-size:12px">${m.description || '<span style="color:var(--text-muted);font-style:italic">no description</span>'}</td>
+        <td style="color:var(--text-secondary);font-size:12px">${m.description || '<span style="color:var(--text-muted);font-style:italic">no description</span>'}</td>
       </tr>
     `).join('')}</tbody>
   </table>`;
@@ -822,36 +820,6 @@ async function saveEdit() {
 }
 
 /* ═══════════════ INLINE INDEX EDIT ═══════════════ */
-function editIndexInline(td, filename, event) {
-  event.stopPropagation();
-  const mem = currentMemories.find(m => m.filename === filename);
-  if (!mem || !mem.index_line) return;
-  const oldLine = mem.index_line;
-  const input = document.createElement('input');
-  input.className = 'desc-edit';
-  input.value = oldLine;
-  td.textContent = '';
-  td.appendChild(input);
-  input.focus();
-  input.select();
-
-  async function save() {
-    const newLine = input.value;
-    if (newLine === oldLine) { loadMemories(); return; }
-    try {
-      await api(`/api/index/${currentContainer.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ old_line: oldLine, new_line: newLine }),
-      });
-      status('Index updated', 'success');
-      await loadMemories();
-      await loadContainers();
-    } catch (e) { status(e.message, 'error'); loadMemories(); }
-  }
-  input.onblur = save;
-  input.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } if (e.key === 'Escape') { loadMemories(); } };
-}
 
 /* ═══════════════ OPERATIONS ═══════════════ */
 async function doMove() {

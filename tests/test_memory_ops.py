@@ -5,25 +5,13 @@ import shutil
 import io
 import zipfile
 import pytest
-from memory_ops import parse_frontmatter, scan_container, list_containers
-
-
-class TestParseFrontmatter:
-    def test_with_frontmatter(self):
-        content = "---\nname: test\ndescription: A test\ntype: feedback\n---\n\nBody here"
-        result = parse_frontmatter(content)
-        assert result["name"] == "test"
-        assert result["description"] == "A test"
-        assert result["type"] == "feedback"
-        assert result["body"] == "Body here"
-
-    def test_without_frontmatter(self):
-        content = "Just plain markdown\nNo frontmatter"
-        result = parse_frontmatter(content)
-        assert result["name"] == ""
-        assert result["description"] == ""
-        assert result["type"] == "unknown"
-        assert result["body"] == content
+from memory_ops import (
+    scan_container, list_containers,
+    _write_log, _backup_file,
+    delete_memories, move_memories,
+    export_memories, import_memories,
+    edit_memory,
+)
 
 
 class TestScanContainer:
@@ -43,7 +31,7 @@ class TestScanContainer:
         entries = scan_container(self.memory_dir)
         assert len(entries) == 1
         assert entries[0]["filename"] == "test.md"
-        assert entries[0]["type"] == "feedback"
+        assert entries[0]["description"] == "A test"
         assert entries[0]["status"] == "ok"
 
     def test_orphan_index_entry(self):
@@ -103,7 +91,6 @@ class TestLoggingAndBackup:
         shutil.rmtree(self.tmpdir)
 
     def test_write_log(self):
-        from memory_ops import _write_log
         log_file = os.path.join(self.manager_dir, "logs", "operations.jsonl")
         _write_log({"action": "test", "file": "x.md"}, log_file=log_file)
         with open(log_file) as f:
@@ -112,7 +99,6 @@ class TestLoggingAndBackup:
         assert "timestamp" in line
 
     def test_backup_file(self):
-        from memory_ops import _backup_file
         src = os.path.join(self.tmpdir, "source.md")
         with open(src, "w") as f:
             f.write("backup me")
@@ -138,7 +124,6 @@ class TestDeleteMemories:
             f.write("content a")
         with open(os.path.join(self.memory_dir, "MEMORY.md"), "w") as f:
             f.write("- [a.md](a.md) — desc a\n- [b.md](b.md) — desc b\n")
-        from memory_ops import delete_memories
         delete_memories(
             self.memory_dir, ["a.md"],
             log_file=os.path.join(self.manager_dir, "logs", "ops.jsonl"),
@@ -155,7 +140,6 @@ class TestDeleteMemories:
             f.write("backup me")
         with open(os.path.join(self.memory_dir, "MEMORY.md"), "w") as f:
             f.write("- [a.md](a.md) — desc\n")
-        from memory_ops import delete_memories
         delete_memories(
             self.memory_dir, ["a.md"],
             log_file=os.path.join(self.manager_dir, "logs", "ops.jsonl"),
@@ -185,7 +169,6 @@ class TestMoveMemories:
             f.write("- [a.md](a.md) — desc a\n")
         with open(os.path.join(self.dst_dir, "MEMORY.md"), "w") as f:
             f.write("")
-        from memory_ops import move_memories
         move_memories(
             self.src_dir, self.dst_dir, ["a.md"],
             log_file=os.path.join(self.manager_dir, "logs", "ops.jsonl"),
@@ -204,7 +187,6 @@ class TestMoveMemories:
             f.write("- [a.md](a.md) — desc\n")
         with open(os.path.join(self.dst_dir, "MEMORY.md"), "w") as f:
             f.write("")
-        from memory_ops import move_memories
         with pytest.raises(FileExistsError):
             move_memories(
                 self.src_dir, self.dst_dir, ["a.md"],
@@ -227,7 +209,6 @@ class TestExportMemories:
             f.write("content a")
         with open(os.path.join(self.memory_dir, "MEMORY.md"), "w") as f:
             f.write("- [a.md](a.md) — desc a\n")
-        from memory_ops import export_memories
         zip_bytes = export_memories(
             self.memory_dir, ["a.md"],
             log_file=os.path.join(self.manager_dir, "logs", "ops.jsonl"),
@@ -266,7 +247,6 @@ class TestImportMemories:
             {"new.md": "---\nname: new\ntype: feedback\n---\nBody"},
             [{"file": "new.md", "index_line": "- [new.md](new.md) — new entry", "target": "/tmp"}],
         )
-        from memory_ops import import_memories
         import_memories(
             self.memory_dir, zip_bytes,
             log_file=os.path.join(self.manager_dir, "logs", "ops.jsonl"),
@@ -282,7 +262,6 @@ class TestImportMemories:
             {"exist.md": "new content"},
             [{"file": "exist.md", "index_line": "- [exist.md](exist.md) — x", "target": "/tmp"}],
         )
-        from memory_ops import import_memories
         with pytest.raises(FileExistsError):
             import_memories(
                 self.memory_dir, zip_bytes,
@@ -303,7 +282,6 @@ class TestEditMemory:
         filepath = os.path.join(self.memory_dir, "a.md")
         with open(filepath, "w") as f:
             f.write("old content")
-        from memory_ops import edit_memory
         edit_memory(self.memory_dir, "a.md", "old content", "new content")
         with open(filepath) as f:
             assert f.read() == "new content"
@@ -312,34 +290,7 @@ class TestEditMemory:
         filepath = os.path.join(self.memory_dir, "a.md")
         with open(filepath, "w") as f:
             f.write("someone else changed this")
-        from memory_ops import edit_memory
         with pytest.raises(ValueError, match="conflict"):
             edit_memory(self.memory_dir, "a.md", "old content", "new content")
 
 
-class TestEditIndex:
-    def setup_method(self):
-        self.tmpdir = tempfile.mkdtemp()
-        self.memory_dir = os.path.join(self.tmpdir, "memory")
-        os.makedirs(self.memory_dir)
-
-    def teardown_method(self):
-        shutil.rmtree(self.tmpdir)
-
-    def test_edit_index_replaces_line(self):
-        with open(os.path.join(self.memory_dir, "MEMORY.md"), "w") as f:
-            f.write("- [a.md](a.md) — old desc\n- [b.md](b.md) — keep\n")
-        from memory_ops import edit_index
-        edit_index(self.memory_dir, "- [a.md](a.md) — old desc", "- [a.md](a.md) — new desc")
-        with open(os.path.join(self.memory_dir, "MEMORY.md")) as f:
-            content = f.read()
-        assert "new desc" in content
-        assert "old desc" not in content
-        assert "keep" in content
-
-    def test_edit_index_conflict(self):
-        with open(os.path.join(self.memory_dir, "MEMORY.md"), "w") as f:
-            f.write("- [a.md](a.md) — actual\n")
-        from memory_ops import edit_index
-        with pytest.raises(ValueError, match="conflict"):
-            edit_index(self.memory_dir, "- [a.md](a.md) — wrong", "- [a.md](a.md) — new")

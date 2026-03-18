@@ -4,7 +4,9 @@ import json
 import shutil
 import zipfile
 import io
+import difflib
 from datetime import datetime
+from itertools import product
 from pathlib import Path
 
 CLAUDE_DIR = Path.home() / ".claude"
@@ -13,26 +15,6 @@ PROJECTS_DIR = CLAUDE_DIR / "projects"
 MANAGER_DIR = Path.home() / ".claude-memory-manager"
 LOG_FILE = MANAGER_DIR / "logs" / "operations.jsonl"
 BACKUP_DIR = MANAGER_DIR / "backups"
-
-
-def parse_frontmatter(content):
-    """Parse YAML frontmatter from markdown content.
-    Returns dict with name, description, type, body."""
-    if content.startswith("---"):
-        parts = content.split("---", 2)
-        if len(parts) >= 3:
-            meta = {}
-            for line in parts[1].strip().splitlines():
-                if ": " in line:
-                    key, val = line.split(": ", 1)
-                    meta[key.strip()] = val.strip()
-            return {
-                "name": meta.get("name", ""),
-                "description": meta.get("description", ""),
-                "type": meta.get("type", "unknown"),
-                "body": parts[2].strip(),
-            }
-    return {"name": "", "description": "", "type": "unknown", "body": content}
 
 
 def _parse_index(memory_dir):
@@ -48,6 +30,12 @@ def _parse_index(memory_dir):
     return result
 
 
+def _desc_from_index_line(index_line):
+    """Extract description text from an index line (text after ' — ')."""
+    m = re.search(r" — (.+)$", index_line)
+    return m.group(1) if m else ""
+
+
 def scan_container(memory_dir):
     """Scan a memory directory and return list of entry dicts."""
     index = _parse_index(memory_dir)
@@ -56,39 +44,23 @@ def scan_container(memory_dir):
 
     for filename, index_line in index.items():
         filepath = os.path.join(memory_dir, filename)
-        if os.path.exists(filepath):
-            with open(filepath, "r") as f:
-                meta = parse_frontmatter(f.read())
-            entries.append({
-                "filename": filename,
-                "name": meta["name"] or filename.replace(".md", ""),
-                "description": meta["description"],
-                "type": meta["type"],
-                "status": "ok",
-                "index_line": index_line,
-            })
-        else:
-            entries.append({
-                "filename": filename,
-                "name": filename.replace(".md", ""),
-                "description": "",
-                "type": "unknown",
-                "status": "orphan",
-                "index_line": index_line,
-            })
+        status = "ok" if os.path.exists(filepath) else "orphan"
+        entries.append({
+            "filename": filename,
+            "name": filename.replace(".md", ""),
+            "description": _desc_from_index_line(index_line),
+            "status": status,
+            "index_line": index_line,
+        })
         seen_files.add(filename)
 
     if os.path.isdir(memory_dir):
         for fname in sorted(os.listdir(memory_dir)):
             if fname.endswith(".md") and fname != "MEMORY.md" and fname not in seen_files:
-                filepath = os.path.join(memory_dir, fname)
-                with open(filepath, "r") as f:
-                    meta = parse_frontmatter(f.read())
                 entries.append({
                     "filename": fname,
-                    "name": meta["name"] or fname.replace(".md", ""),
-                    "description": meta["description"],
-                    "type": meta["type"],
+                    "name": fname.replace(".md", ""),
+                    "description": "",
                     "status": "unindexed",
                     "index_line": "",
                 })
@@ -98,9 +70,17 @@ def scan_container(memory_dir):
 
 def _friendly_name(encoded):
     home_user = f"-home-{os.environ.get('USER', 'user')}-"
-    if encoded.startswith(home_user):
-        return "~/" + encoded[len(home_user):].replace("-", "/")
-    return encoded.replace("-", "/")
+    if not encoded.startswith(home_user):
+        return encoded.replace("-", "/")
+    suffix = encoded[len(home_user):]
+    home = str(Path.home())
+    # Try all 2^n decodings of '-' as '/' or '-', return first existing path
+    parts = suffix.split("-")
+    for combo in product(*[["/" , "-"] if i > 0 else [""] for i in range(len(parts))]):
+        candidate = parts[0] + "".join(c + p for c, p in zip(combo[1:], parts[1:]))
+        if os.path.isdir(os.path.join(home, candidate)):
+            return "~/" + candidate
+    return "~/" + suffix.replace("-", "/")
 
 
 def _write_log(entry, log_file=None):
@@ -234,25 +214,27 @@ def import_memories(memory_dir, zip_bytes, container_id="", log_file=None):
     _write_log({"action": "import", "container": container_id, "files": imported_files, "source_zip": "upload"}, log_file=log_file)
 
 
-def edit_memory(memory_dir, filename, old_content, new_content):
+def edit_memory(memory_dir, filename, old_content, new_content, container_id="", log_file=None):
     filepath = os.path.join(memory_dir, filename)
     with open(filepath, "r") as f:
         current = f.read()
     if current != old_content:
         raise ValueError("conflict: file has been modified since last read")
+    patch = "".join(difflib.unified_diff(
+        old_content.splitlines(keepends=True),
+        new_content.splitlines(keepends=True),
+        fromfile=f"a/{filename}",
+        tofile=f"b/{filename}",
+    ))
     with open(filepath, "w") as f:
         f.write(new_content)
+    _write_log({
+        "action": "edit_memory",
+        "container": container_id,
+        "file": filename,
+        "patch": patch,
+    }, log_file=log_file)
 
-
-def edit_index(memory_dir, old_line, new_line):
-    index_path = os.path.join(memory_dir, "MEMORY.md")
-    with open(index_path, "r") as f:
-        content = f.read()
-    if old_line not in content:
-        raise ValueError("conflict: index line not found, may have been modified")
-    content = content.replace(old_line, new_line, 1)
-    with open(index_path, "w") as f:
-        f.write(content)
 
 
 def list_containers(global_dir=None, projects_dir=None):

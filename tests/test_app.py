@@ -1,8 +1,9 @@
+import io
 import os
-import sys
 import json
 import tempfile
 import shutil
+import zipfile
 import pytest
 
 # Patch memory_ops paths before importing app
@@ -84,38 +85,31 @@ def test_delete(client):
 def test_export(client):
     resp = client.post("/api/export", json={"files": ["g.md"], "container": "global"})
     assert resp.status_code == 200
-    assert resp.content_type == "application/zip"
+    with zipfile.ZipFile(io.BytesIO(resp.data)) as zf:
+        assert "g.md" in zf.namelist()
+        manifest = json.loads(zf.read("manifest.json"))
+        assert manifest[0]["file"] == "g.md"
 
 def test_import(client):
     resp = client.post("/api/export", json={"files": ["p.md"], "container": "-home-user-proj"})
     zip_bytes = resp.data
     client.post("/api/delete", json={"files": ["p.md"], "container": "-home-user-proj"})
-    import io
-    data = {"file": (io.BytesIO(zip_bytes), "export.zip"), "container": "global"}
-    resp = client.post("/api/import", data=data, content_type="multipart/form-data")
+    resp = client.post("/api/import",
+        data={"file": (io.BytesIO(zip_bytes), "export.zip"), "container": "global"},
+        content_type="multipart/form-data")
     assert resp.status_code == 200
+    assert os.path.exists(os.path.join(str(memory_ops.GLOBAL_MEMORY_DIR), "p.md"))
 
 def test_edit_memory(client):
+    new_content = "---\nname: g\ndescription: updated\ntype: user\n---\n\nUpdated body"
     resp = client.put("/api/memory/global/g.md", json={
         "old_content": "---\nname: g\ndescription: global entry\ntype: user\n---\n\nGlobal body",
-        "new_content": "---\nname: g\ndescription: updated\ntype: user\n---\n\nUpdated body",
+        "new_content": new_content,
     })
     assert resp.status_code == 200
+    with open(os.path.join(str(memory_ops.GLOBAL_MEMORY_DIR), "g.md")) as f:
+        assert f.read() == new_content
 
 def test_edit_memory_conflict(client):
     resp = client.put("/api/memory/global/g.md", json={"old_content": "wrong", "new_content": "new"})
-    assert resp.status_code == 409
-
-def test_edit_index(client):
-    resp = client.put("/api/index/global", json={
-        "old_line": "- [g.md](g.md) — global entry",
-        "new_line": "- [g.md](g.md) — updated global entry",
-    })
-    assert resp.status_code == 200
-
-def test_edit_index_conflict(client):
-    resp = client.put("/api/index/global", json={
-        "old_line": "- [g.md](g.md) — nonexistent line",
-        "new_line": "- [g.md](g.md) — new",
-    })
     assert resp.status_code == 409

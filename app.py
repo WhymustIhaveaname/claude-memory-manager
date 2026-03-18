@@ -56,7 +56,7 @@ def handle_memory(container_id, filename):
         if not data or not all(k in data for k in ("old_content", "new_content")):
             return jsonify({"error": "Missing fields: old_content, new_content"}), 400
         try:
-            memory_ops.edit_memory(path, filename, data["old_content"], data["new_content"])
+            memory_ops.edit_memory(path, filename, data["old_content"], data["new_content"], container_id=container_id)
             return jsonify({"ok": True})
         except ValueError:
             return jsonify({"error": "Conflict: file modified since last read"}), 409
@@ -119,20 +119,6 @@ def import_memories():
     except Exception as e:
         return jsonify({"error": f"Invalid zip: {e}"}), 400
 
-
-@app.route("/api/index/<container_id>", methods=["PUT"])
-def edit_index(container_id):
-    data = request.get_json()
-    if not data or not all(k in data for k in ("old_line", "new_line")):
-        return jsonify({"error": "Missing fields: old_line, new_line"}), 400
-    path = _resolve_container(container_id)
-    if not path:
-        return jsonify({"error": "Container not found"}), 404
-    try:
-        memory_ops.edit_index(path, data["old_line"], data["new_line"])
-        return jsonify({"ok": True})
-    except ValueError:
-        return jsonify({"error": "Conflict: index line not found or modified"}), 409
 
 
 if __name__ == "__main__":
