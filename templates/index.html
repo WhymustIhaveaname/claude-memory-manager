@@ -711,6 +711,8 @@ function updateMoveDropdown() {
 
 async function selectFolder(id) {
   currentContainer = containers.find(c => c.id === id);
+  localStorage.setItem('selectedContainer', id);
+  localStorage.removeItem('selectedMemory');
   renderFolders();
   updateMoveDropdown();
   await loadMemories();
@@ -768,6 +770,7 @@ function toggleAll(master) {
 async function selectMemory(filename, event) {
   if (event && (event.target.tagName === 'INPUT' || event.target.classList.contains('desc-edit'))) return;
   previewFile = filename;
+  localStorage.setItem('selectedMemory', filename);
   highlightActiveRow();
   const resp = await api(`/api/memory/${currentContainer.id}/${filename}`);
   const data = await resp.json();
@@ -923,7 +926,16 @@ async function dropOnFolder(event, targetId) {
 }
 
 /* ═══════════════ INIT ═══════════════ */
-loadContainers();
+loadContainers().then(async () => {
+  const savedContainer = localStorage.getItem('selectedContainer');
+  const savedMemory = localStorage.getItem('selectedMemory');
+  if (savedContainer && containers.find(c => c.id === savedContainer)) {
+    await selectFolder(savedContainer);
+    if (savedMemory && currentMemories.find(m => m.filename === savedMemory)) {
+      await selectMemory(savedMemory);
+    }
+  }
+});
 </script>
 </body>
 </html>

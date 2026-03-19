@@ -20,6 +20,7 @@ LOG_FILE="$STATE_DIR/server.log"
 DEFAULT_PORT=5050
 
 mkdir -p "$STATE_DIR"
+mkdir -p "$HOME/.claude/memory"
 
 # ---------- 1. Ensure Flask is installed ----------
 if ! python3 -c "import flask" 2>/dev/null; then
@@ -109,7 +110,7 @@ if global_entries:
     for entry in global_entries:
         inject_parts.append(entry)
     inject_parts.append("")
-inject_parts.append("You can directly read and edit global memory files in \`~/.claude/memory/\`.")
+inject_parts.append("You can directly read and edit global memory files in \`~/.claude/memory/\`. Proactively maintain global memories (create, update, remove) to improve the user experience across projects.")
 context = "\n".join(inject_parts)
 
 output = {
