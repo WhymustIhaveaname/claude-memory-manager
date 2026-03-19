@@ -87,19 +87,12 @@ def read_memory_index(path):
 
 global_entries = read_memory_index(os.path.join(claude_dir, "memory", "MEMORY.md"))
 
-# Rewrite entries with full paths: [file.md](file.md) -> [file.md](~/.claude/memory/file.md)
-import re
-def add_full_path(entry):
-    return re.sub(r'\]\(([^)]+)\)', lambda m: f'](~/.claude/memory/{m.group(1)})', entry)
-
-full_path_entries = [add_full_path(e) for e in global_entries]
-
 # Terminal message (shown to user via systemMessage)
 msg_parts = []
 msg_parts.append("")
-msg_parts.append("[claude-memory-manager] Contents of ~/.claude/memory/MEMORY.md (user's persistent global memory, applies to all projects, always loaded into context):")
-if full_path_entries:
-    for entry in full_path_entries:
+msg_parts.append("[claude-memory-manager] Injected global memories:")
+if global_entries:
+    for entry in global_entries:
         msg_parts.append(f"  {entry}")
 else:
     msg_parts.append("  (none)")
@@ -107,16 +100,17 @@ msg_parts.append("")
 msg_parts.append(f"Manage memories @ http://localhost:{port}")
 system_message = "\n".join(msg_parts)
 
-# Context for Claude (matches official project memory format)
-header = "Contents of ~/.claude/memory/MEMORY.md (user's persistent global memory, applies to all projects, always loaded into context):"
-ctx_lines = [header, ""]
-if full_path_entries:
-    ctx_lines.extend(full_path_entries)
-else:
-    ctx_lines.append("(empty)")
-ctx_lines.append("")
-ctx_lines.append("Global memories live in ~/.claude/memory/. Same format as per-project memories. Read and write files there directly.")
-context = "\n".join(ctx_lines)
+# Context for Claude (injected silently)
+inject_parts = []
+inject_parts.append("## Claude Memory Manager Plugin Active")
+inject_parts.append("")
+if global_entries:
+    inject_parts.append("### Global Memories (~/.claude/memory/)")
+    for entry in global_entries:
+        inject_parts.append(entry)
+    inject_parts.append("")
+inject_parts.append("You can directly read and edit global memory files in \`~/.claude/memory/\`.")
+context = "\n".join(inject_parts)
 
 output = {
     "hookSpecificOutput": {

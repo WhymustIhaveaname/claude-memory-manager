@@ -42,6 +42,16 @@ class TestScanContainer:
         assert entries[0]["filename"] == "gone.md"
         assert entries[0]["status"] == "orphan"
 
+    def test_indexed_file_hyphen_separator(self):
+        with open(os.path.join(self.memory_dir, "test.md"), "w") as f:
+            f.write("---\nname: test\ntype: feedback\n---\n\nBody")
+        with open(os.path.join(self.memory_dir, "MEMORY.md"), "w") as f:
+            f.write("- [test.md](test.md) - A hyphen desc\n")
+        entries = scan_container(self.memory_dir)
+        assert len(entries) == 1
+        assert entries[0]["description"] == "A hyphen desc"
+        assert entries[0]["status"] == "ok"
+
     def test_unindexed_file(self):
         with open(os.path.join(self.memory_dir, "extra.md"), "w") as f:
             f.write("---\nname: extra\ndescription: Not indexed\ntype: user\n---\n\nContent")

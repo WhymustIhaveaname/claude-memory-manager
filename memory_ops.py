@@ -32,7 +32,7 @@ def _parse_index(memory_dir):
 
 def _desc_from_index_line(index_line):
     """Extract description text from an index line (text after ' — ')."""
-    m = re.search(r" — (.+)$", index_line)
+    m = re.search(r" (?:—|-) (.+)$", index_line)
     return m.group(1) if m else ""
 
 
