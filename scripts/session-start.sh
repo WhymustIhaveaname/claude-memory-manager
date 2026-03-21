@@ -110,7 +110,13 @@ if global_entries:
     for entry in global_entries:
         inject_parts.append(entry)
     inject_parts.append("")
-inject_parts.append("You can directly read and edit global memory files in \`~/.claude/memory/\`. Proactively maintain global memories (create, update, remove) to improve the user experience across projects.")
+inject_parts.append("### Global memory rules")
+inject_parts.append("")
+inject_parts.append("Global memory (`~/.claude/memory/`) is the cross-project counterpart to project memory (`~/.claude/projects/*/memory/`). Both tiers share the same types, format, save process, exclusion rules, staleness checks, and verification steps defined in the `# auto memory` section of your system prompt. The only differences are:")
+inject_parts.append("")
+inject_parts.append("- **Scope**: Global memories apply across ALL projects. Save something globally when it is not specific to one repo — user identity, cross-project preferences, workflow corrections, external system references. Proactively maintain global memories to improve the user experience across projects.")
+inject_parts.append("- **Path**: Read and write global memory files directly in `~/.claude/memory/`. Index goes in `~/.claude/memory/MEMORY.md`.")
+inject_parts.append("- **When to save globally vs per-project**: If the memory is about the user (role, preferences, feedback on your behavior) or spans multiple projects, save it globally. If it is about a specific codebase, architecture, or project decision, save it per-project.")
 context = "\n".join(inject_parts)
 
 output = {
