@@ -11,6 +11,17 @@ Claude Code keeps memory files per project (`~/.claude/projects/<project>/memory
 
 Adds global memory and a web UI for managing all of Claude's memories.
 
+<table>
+<tr>
+<td><img src="docs/terminal.png" alt="Terminal injection" width="500"></td>
+<td><img src="docs/webui.png" alt="Web UI" width="500"></td>
+</tr>
+<tr>
+<td align="center">Global memories injected at session start</td>
+<td align="center">Web UI for browsing and editing memories</td>
+</tr>
+</table>
+
 **Global memory:**
 - Keeps cross-project memories in `~/.claude/memory/`
 - Injects them into context at session start via a SessionStart hook
