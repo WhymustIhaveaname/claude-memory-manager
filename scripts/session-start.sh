@@ -22,12 +22,25 @@ DEFAULT_PORT=5050
 mkdir -p "$STATE_DIR"
 mkdir -p "$HOME/.claude/memory"
 
-# ---------- 1. Ensure Flask is installed ----------
-if ! python3 -c "import flask" 2>/dev/null; then
+# ---------- 1. Ensure venv & Flask are installed ----------
+VENV_DIR="$PLUGIN_ROOT/.venv"
+PYTHON="$VENV_DIR/bin/python"
+if [ ! -f "$PYTHON" ]; then
   if command -v uv >/dev/null 2>&1; then
-    uv pip install flask --quiet 2>/dev/null || true
+    uv venv "$VENV_DIR" --quiet 2>/dev/null || true
+  elif [ -f "$HOME/.local/bin/uv" ]; then
+    "$HOME/.local/bin/uv" venv "$VENV_DIR" --quiet 2>/dev/null || true
   else
-    python3 -m pip install flask --quiet 2>/dev/null || true
+    python3 -m venv "$VENV_DIR" 2>/dev/null || true
+  fi
+fi
+if ! "$PYTHON" -c "import flask" 2>/dev/null; then
+  if command -v uv >/dev/null 2>&1; then
+    uv pip install flask --python "$PYTHON" --quiet 2>/dev/null || true
+  elif [ -f "$HOME/.local/bin/uv" ]; then
+    "$HOME/.local/bin/uv" pip install flask --python "$PYTHON" --quiet 2>/dev/null || true
+  else
+    "$PYTHON" -m pip install flask --quiet 2>/dev/null || true
   fi
 fi
 
@@ -53,7 +66,7 @@ if [ "$server_running" = false ]; then
     fi
   done
 
-  nohup python3 "$PLUGIN_ROOT/app.py" --port "$PORT" > "$LOG_FILE" 2>&1 &
+  nohup "$PYTHON" "$PLUGIN_ROOT/app.py" --port "$PORT" > "$LOG_FILE" 2>&1 &
   SERVER_PID=$!
   disown "$SERVER_PID" 2>/dev/null || true
   echo "$SERVER_PID" > "$PID_FILE"
