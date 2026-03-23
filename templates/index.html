@@ -2,6 +2,7 @@
 <html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Claude Memory Manager</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -300,6 +301,7 @@ body {
 .memory-list tr[draggable="true"] { cursor: grab; }
 .memory-list tr[draggable="true"]:active { cursor: grabbing; }
 .mem-name { font-weight: 500; font-family: var(--font-mono); font-size: 12px; color: var(--text-primary); }
+.mobile-desc { display: none; }
 
 /* Checkbox */
 .mem-check {
@@ -537,6 +539,214 @@ body {
 .memory-list tbody tr:nth-child(8) { animation-delay: .16s; }
 .memory-list tbody tr:nth-child(9) { animation-delay: .18s; }
 .memory-list tbody tr:nth-child(10) { animation-delay: .2s; }
+
+/* ═══════════════ MOBILE TAB BAR ═══════════════ */
+.mobile-tabs {
+  display: none;
+  height: 52px;
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.mobile-tabs button {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  transition: color var(--transition);
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
+}
+.mobile-tabs button .tab-icon { font-size: 18px; line-height: 1; }
+.mobile-tabs button.active {
+  color: var(--accent-text);
+}
+.mobile-tabs button.active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 20%;
+  right: 20%;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 0 0 2px 2px;
+}
+
+/* ═══════════════ CONTEXT MENU (mobile long-press) ═══════════════ */
+.ctx-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0,0,0,.4);
+  -webkit-tap-highlight-color: transparent;
+}
+.ctx-overlay.open { display: block; }
+.ctx-menu {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 101;
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border);
+  border-radius: var(--radius-l) var(--radius-l) 0 0;
+  padding: 8px 0 env(safe-area-inset-bottom, 8px);
+  transform: translateY(100%);
+  transition: transform .25s cubic-bezier(.4,0,.2,1);
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.ctx-overlay.open .ctx-menu { transform: translateY(0); }
+.ctx-menu-title {
+  padding: 14px 20px 8px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-text);
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ctx-menu-section {
+  padding: 6px 20px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+}
+.ctx-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  font-size: 15px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background var(--transition);
+  -webkit-tap-highlight-color: transparent;
+}
+.ctx-menu-item:active { background: var(--bg-hover); }
+.ctx-menu-item .ctx-icon { font-size: 17px; width: 24px; text-align: center; flex-shrink: 0; }
+.ctx-menu-item.danger { color: var(--danger); }
+.ctx-menu-cancel {
+  display: block;
+  width: calc(100% - 32px);
+  margin: 8px 16px;
+  padding: 14px;
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent-text);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  cursor: pointer;
+  text-align: center;
+  -webkit-tap-highlight-color: transparent;
+}
+.ctx-menu-cancel:active { background: var(--bg-hover); }
+
+/* ═══════════════ MOBILE LAYOUT ═══════════════ */
+@media (max-width: 767px) {
+  html, body { height: 100%; overflow: hidden; }
+  body { height: 100dvh; }
+
+  .header { padding: 0 14px; height: 44px; }
+  .header-title { font-size: 13px; }
+
+  .main {
+    padding: 0;
+    gap: 0;
+    position: relative;
+  }
+
+  .resize-handle { display: none !important; }
+
+  .mobile-tabs { display: flex; }
+
+  .panel {
+    position: absolute;
+    inset: 0;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s ease;
+    width: 100% !important;
+  }
+  .panel.mobile-visible {
+    opacity: 1;
+    pointer-events: auto;
+    z-index: 2;
+  }
+
+  /* Folders panel */
+  .folders { width: 100% !important; min-width: 0; }
+  .folders-header { padding: 12px 16px 8px; }
+  .folder { padding: 12px 14px; font-size: 14px; }
+  .folder-icon { font-size: 17px; }
+
+  /* Memory list */
+  .memories { width: 100% !important; min-width: 0; }
+  .memory-list td { padding: 12px 14px; font-size: 14px; }
+  .memory-list th { padding: 0 14px; height: 38px; }
+  .memory-list th:last-child { display: none; }
+  .memory-list td:last-child { display: none; }
+  .mobile-desc {
+    display: block;
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--text-muted);
+    margin-top: 3px;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mem-name { font-size: 13px; }
+  .mem-check { width: 20px; height: 20px; }
+  .mem-check:checked::after { left: 5.5px; top: 2px; width: 5px; height: 9px; }
+
+  /* Toolbar */
+  .toolbar {
+    height: auto;
+    padding: 8px 10px;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .toolbar select,
+  .toolbar .btn,
+  .toolbar .btn-import {
+    font-size: 12px;
+    padding: 8px 12px;
+    min-height: 36px;
+  }
+
+  /* Preview */
+  .preview { width: 100% !important; min-width: 0; }
+  .preview-header { padding: 0 14px; }
+  .preview-body { padding: 14px; }
+  .preview-body pre { font-size: 12px; line-height: 1.6; }
+  .preview-body textarea { font-size: 14px; line-height: 1.6; }
+
+  /* Status bar */
+  .status-bar { padding: 4px 14px; min-height: 26px; font-size: 11px; }
+}
 </style>
 </head>
 <body>
@@ -577,6 +787,20 @@ body {
   <div class="panel preview" id="preview">
     <div class="empty-state"><span class="empty-icon">&#128196;</span>Select a memory to preview</div>
   </div>
+</div>
+<div class="ctx-overlay" id="ctxOverlay" onclick="closeCtxMenu()">
+  <div class="ctx-menu" onclick="event.stopPropagation()" id="ctxMenu"></div>
+</div>
+<div class="mobile-tabs" id="mobileTabs">
+  <button class="active" data-panel="folders" onclick="switchMobileTab('folders')">
+    <span class="tab-icon">&#128193;</span>Containers
+  </button>
+  <button data-panel="memories" onclick="switchMobileTab('memories')">
+    <span class="tab-icon">&#128203;</span>Memories
+  </button>
+  <button data-panel="preview" onclick="switchMobileTab('preview')">
+    <span class="tab-icon">&#128196;</span>Preview
+  </button>
 </div>
 <div class="status-bar" id="statusBar"></div>
 
@@ -747,12 +971,13 @@ function renderMemories() {
           onclick="selectMemory('${m.filename}', event)"
           ondragstart="dragStart(event, '${m.filename}')">
         <td><input type="checkbox" class="mem-check" data-file="${m.filename}" onclick="event.stopPropagation()"></td>
-        <td><span class="mem-name">${m.name}</span>${m.status !== 'ok' ? `<span class="badge ${m.status}">${m.status}</span>` : ''}</td>
+        <td><span class="mem-name">${m.name}</span>${m.status !== 'ok' ? `<span class="badge ${m.status}">${m.status}</span>` : ''}${m.description ? `<span class="mobile-desc">${m.description}</span>` : ''}</td>
         <td style="color:var(--text-secondary);font-size:12px">${m.description || '<span style="color:var(--text-muted);font-style:italic">no description</span>'}</td>
       </tr>
     `).join('')}</tbody>
   </table>`;
   highlightActiveRow();
+  attachLongPress();
 }
 
 function highlightActiveRow() {
@@ -924,6 +1149,162 @@ async function dropOnFolder(event, targetId) {
     if (currentContainer && currentContainer.id === data.from) await loadMemories();
   } catch (e) { status(e.message, 'error'); }
 }
+
+/* ═══════════════ LONG-PRESS CONTEXT MENU ═══════════════ */
+let longPressTimer = null;
+let longPressTriggered = false;
+
+function attachLongPress() {
+  if (!isMobile()) return;
+  document.querySelectorAll('.memory-list tbody tr[data-file]').forEach(row => {
+    row.addEventListener('touchstart', onTouchStart, { passive: true });
+    row.addEventListener('touchend', onTouchEnd);
+    row.addEventListener('touchmove', onTouchCancel);
+    row.addEventListener('touchcancel', onTouchCancel);
+  });
+}
+
+function onTouchStart(e) {
+  longPressTriggered = false;
+  const row = e.currentTarget;
+  const filename = row.dataset.file;
+  longPressTimer = setTimeout(() => {
+    longPressTriggered = true;
+    navigator.vibrate && navigator.vibrate(30);
+    openCtxMenu(filename);
+  }, 500);
+}
+
+function onTouchEnd(e) {
+  clearTimeout(longPressTimer);
+  if (longPressTriggered) {
+    e.preventDefault();
+  }
+}
+
+function onTouchCancel() {
+  clearTimeout(longPressTimer);
+  longPressTriggered = false;
+}
+
+function openCtxMenu(filename) {
+  const mem = currentMemories.find(m => m.filename === filename);
+  const overlay = document.getElementById('ctxOverlay');
+  const menu = document.getElementById('ctxMenu');
+
+  const moveTargets = containers
+    .filter(c => !currentContainer || c.id !== currentContainer.id)
+    .map(c => {
+      const icon = c.id === 'global' ? '🌐' : '📂';
+      return `<div class="ctx-menu-item" onclick="ctxMove('${filename}','${c.id}')">`
+        + `<span class="ctx-icon">${icon}</span>${c.name}</div>`;
+    }).join('');
+
+  menu.innerHTML = `
+    <div class="ctx-menu-title">${mem ? mem.name : filename}</div>
+    <div class="ctx-menu-item" onclick="ctxPreview('${filename}')">
+      <span class="ctx-icon">👁</span>Preview
+    </div>
+    <div class="ctx-menu-section">Move to</div>
+    ${moveTargets}
+    <div class="ctx-menu-item danger" onclick="ctxDelete('${filename}')">
+      <span class="ctx-icon">✕</span>Delete
+    </div>
+    <button class="ctx-menu-cancel" onclick="closeCtxMenu()">Cancel</button>
+  `;
+
+  overlay.classList.add('open');
+}
+
+function closeCtxMenu() {
+  document.getElementById('ctxOverlay').classList.remove('open');
+}
+
+async function ctxPreview(filename) {
+  closeCtxMenu();
+  await _origSelectMemory(filename);
+  switchMobileTab('preview');
+}
+
+async function ctxMove(filename, targetId) {
+  closeCtxMenu();
+  try {
+    await api('/api/move', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files: [filename], from: currentContainer.id, to: targetId }),
+    });
+    const target = containers.find(c => c.id === targetId);
+    status(`Moved to ${target ? target.name : targetId}`, 'success');
+    await loadContainers();
+    await loadMemories();
+  } catch (e) { status(e.message, 'error'); }
+}
+
+async function ctxDelete(filename) {
+  closeCtxMenu();
+  if (!confirm(`Delete ${filename}?`)) return;
+  try {
+    await api('/api/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files: [filename], container: currentContainer.id }),
+    });
+    status('Deleted', 'success');
+    await loadContainers();
+    await loadMemories();
+    if (previewFile === filename) { previewFile = null; previewContent = null; renderPreview(); }
+  } catch (e) { status(e.message, 'error'); }
+}
+
+/* ═══════════════ MOBILE PANELS ═══════════════ */
+const isMobile = () => window.matchMedia('(max-width: 767px)').matches;
+
+function switchMobileTab(panel) {
+  if (!isMobile()) return;
+  document.querySelectorAll('.mobile-tabs button').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.mobile-tabs button[data-panel="${panel}"]`).classList.add('active');
+  document.querySelectorAll('.main .panel').forEach(p => p.classList.remove('mobile-visible'));
+  if (panel === 'folders') foldersPanel.classList.add('mobile-visible');
+  else if (panel === 'memories') document.querySelector('.memories').classList.add('mobile-visible');
+  else previewPanel.classList.add('mobile-visible');
+}
+
+function applyMobileLayout() {
+  if (isMobile()) {
+    // Reset inline widths set by resize logic
+    [foldersPanel, memoriesPanel, previewPanel].forEach(p => {
+      p.style.flex = '';
+      p.style.width = '';
+    });
+    // Show whichever tab is active
+    const activeTab = document.querySelector('.mobile-tabs button.active');
+    if (activeTab) switchMobileTab(activeTab.dataset.panel);
+    else switchMobileTab('folders');
+  } else {
+    // Desktop: remove mobile-visible, restore panel sizing
+    document.querySelectorAll('.main .panel').forEach(p => p.classList.remove('mobile-visible'));
+    initPanelWidths();
+  }
+}
+
+window.addEventListener('resize', applyMobileLayout);
+// Apply on load
+requestAnimationFrame(applyMobileLayout);
+
+// Override selectFolder to auto-switch to memories tab on mobile
+const _origSelectFolder = selectFolder;
+selectFolder = async function(id) {
+  await _origSelectFolder(id);
+  if (isMobile()) switchMobileTab('memories');
+};
+
+// Override selectMemory to auto-switch to preview tab on mobile
+const _origSelectMemory = selectMemory;
+selectMemory = async function(filename, event) {
+  await _origSelectMemory(filename, event);
+  if (isMobile()) switchMobileTab('preview');
+};
 
 /* ═══════════════ INIT ═══════════════ */
 loadContainers().then(async () => {
