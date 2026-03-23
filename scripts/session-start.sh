@@ -130,6 +130,11 @@ inject_parts.append("")
 inject_parts.append("- **Scope**: Global memories apply across ALL projects. Save something globally when it is not specific to one repo — user identity, cross-project preferences, workflow corrections, external system references. Proactively maintain global memories to improve the user experience across projects.")
 inject_parts.append("- **Path**: Read and write global memory files directly in `~/.claude/memory/`. Index goes in `~/.claude/memory/MEMORY.md`.")
 inject_parts.append("- **When to save globally vs per-project**: If the memory is about the user (role, preferences, feedback on your behavior) or spans multiple projects, save it globally. If it is about a specific codebase, architecture, or project decision, save it per-project.")
+inject_parts.append("")
+inject_parts.append("### Memory best practices")
+inject_parts.append("")
+inject_parts.append("- **Think before you write**: Before saving a memory, ask yourself: \"What can I write now that will be useful to a future me whose conversation context has been wiped clean?\" If the answer is nothing non-obvious, don't save it.")
+inject_parts.append("- **Merge, don't proliferate**: When information on a topic evolves, fold it into the existing memory file for that topic — broaden the file's scope and update its description if needed. Only create a new file when there is genuinely no existing file it fits into. The goal is to avoid a sprawl of tiny, fragmented memory files.")
 context = "\n".join(inject_parts)
 
 output = {
