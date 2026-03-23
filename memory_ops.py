@@ -24,7 +24,7 @@ def _parse_index(memory_dir):
     if os.path.exists(index_path):
         with open(index_path, "r") as f:
             for line in f:
-                m = re.match(r"- \[([^\]]+)\]\(", line.strip())
+                m = re.match(r"- \[[^\]]+\]\(([^)]+)\)", line.strip())
                 if m:
                     result[m.group(1)] = line.strip()
     return result
