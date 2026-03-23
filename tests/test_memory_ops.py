@@ -52,6 +52,18 @@ class TestScanContainer:
         assert entries[0]["description"] == "A hyphen desc"
         assert entries[0]["status"] == "ok"
 
+    def test_indexed_file_display_without_md(self):
+        """Display text in index lacks .md suffix: [test](test.md)"""
+        with open(os.path.join(self.memory_dir, "test.md"), "w") as f:
+            f.write("---\nname: test\ntype: feedback\n---\n\nBody")
+        with open(os.path.join(self.memory_dir, "MEMORY.md"), "w") as f:
+            f.write("- [test](test.md) — A test\n")
+        entries = scan_container(self.memory_dir)
+        assert len(entries) == 1
+        assert entries[0]["filename"] == "test.md"
+        assert entries[0]["description"] == "A test"
+        assert entries[0]["status"] == "ok"
+
     def test_unindexed_file(self):
         with open(os.path.join(self.memory_dir, "extra.md"), "w") as f:
             f.write("---\nname: extra\ndescription: Not indexed\ntype: user\n---\n\nContent")
@@ -145,6 +157,23 @@ class TestDeleteMemories:
         assert "a.md" not in content
         assert "b.md" in content
 
+    def test_delete_removes_index_when_display_lacks_md(self):
+        """Index line uses [a](a.md) — display text without .md suffix."""
+        with open(os.path.join(self.memory_dir, "a.md"), "w") as f:
+            f.write("content a")
+        with open(os.path.join(self.memory_dir, "MEMORY.md"), "w") as f:
+            f.write("- [a](a.md) — desc a\n- [b](b.md) — desc b\n")
+        delete_memories(
+            self.memory_dir, ["a.md"],
+            log_file=os.path.join(self.manager_dir, "logs", "ops.jsonl"),
+            backup_dir=os.path.join(self.manager_dir, "backups"),
+        )
+        assert not os.path.exists(os.path.join(self.memory_dir, "a.md"))
+        with open(os.path.join(self.memory_dir, "MEMORY.md")) as f:
+            content = f.read()
+        assert "a.md" not in content
+        assert "b.md" in content
+
     def test_delete_creates_backup(self):
         with open(os.path.join(self.memory_dir, "a.md"), "w") as f:
             f.write("backup me")
@@ -185,6 +214,25 @@ class TestMoveMemories:
         )
         assert not os.path.exists(os.path.join(self.src_dir, "a.md"))
         assert os.path.exists(os.path.join(self.dst_dir, "a.md"))
+        with open(os.path.join(self.dst_dir, "MEMORY.md")) as f:
+            assert "a.md" in f.read()
+
+    def test_move_transfers_when_display_lacks_md(self):
+        """Index line uses [a](a.md) — display text without .md suffix."""
+        with open(os.path.join(self.src_dir, "a.md"), "w") as f:
+            f.write("content a")
+        with open(os.path.join(self.src_dir, "MEMORY.md"), "w") as f:
+            f.write("- [a](a.md) — desc a\n")
+        with open(os.path.join(self.dst_dir, "MEMORY.md"), "w") as f:
+            f.write("")
+        move_memories(
+            self.src_dir, self.dst_dir, ["a.md"],
+            log_file=os.path.join(self.manager_dir, "logs", "ops.jsonl"),
+        )
+        assert not os.path.exists(os.path.join(self.src_dir, "a.md"))
+        assert os.path.exists(os.path.join(self.dst_dir, "a.md"))
+        with open(os.path.join(self.src_dir, "MEMORY.md")) as f:
+            assert "a.md" not in f.read()
         with open(os.path.join(self.dst_dir, "MEMORY.md")) as f:
             assert "a.md" in f.read()
 

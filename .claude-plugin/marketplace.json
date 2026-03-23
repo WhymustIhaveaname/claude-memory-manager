@@ -8,7 +8,7 @@
   "plugins": [
     {
       "name": "claude-memory-manager",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "source": "./",
       "description": "Global memory manager for Claude Code — auto-inject, edit, and organize memories with a visual web UI"
     }

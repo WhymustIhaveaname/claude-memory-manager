@@ -114,7 +114,7 @@ def _remove_index_lines(memory_dir, filenames):
     for line in lines:
         matched = False
         for fname in filenames:
-            if f"[{fname}]" in line:
+            if f"({fname})" in line:
                 removed[fname] = line.strip()
                 matched = True
                 break

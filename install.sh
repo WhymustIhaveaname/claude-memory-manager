@@ -5,7 +5,7 @@ set -euo pipefail
 
 MARKETPLACE_NAME="WhymustIhaveaname"
 PLUGIN_NAME="claude-memory-manager"
-PLUGIN_VERSION="1.0.0"
+PLUGIN_VERSION="1.1.0"
 REPO_URL="https://github.com/WhymustIhaveaname/claude-memory-manager"
 
 PLUGINS_DIR="$HOME/.claude/plugins"
