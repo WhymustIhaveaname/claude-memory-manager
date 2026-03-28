@@ -111,7 +111,6 @@ if global_entries:
 else:
     msg_parts.append("  (none)")
 msg_parts.append("")
-msg_parts.append(f"Manage memories @ http://localhost:{port}")
 
 # Shared rules and best practices (shown to both user and Claude)
 rules_parts = []
@@ -136,6 +135,8 @@ rules_text = "\n".join(rules_parts)
 # Terminal message (append rules so user can see them too)
 msg_parts.append("")
 msg_parts.append(rules_text)
+msg_parts.append("")
+msg_parts.append(f"Manage memories @ http://localhost:{port}")
 system_message = "\n".join(msg_parts)
 
 # Context for Claude (injected silently)
