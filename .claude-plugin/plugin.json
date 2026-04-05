@@ -1,6 +1,6 @@
 {
   "name": "claude-memory-manager",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "description": "Global memory manager for Claude Code — auto-injects memories at session start, enables global memory editing, with a visual web UI for browsing and organizing",
   "author": { "name": "WhymustIhaveaname" },
   "license": "MIT",

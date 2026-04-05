@@ -132,9 +132,9 @@ rules_parts.append("  2. Write the description so that someone reading *only* th
 rules_parts.append("  - When updating a memory's content, re-run the same steps to keep the description in sync.")
 rules_text = "\n".join(rules_parts)
 
-# Terminal message (append rules so user can see them too)
-msg_parts.append("")
-msg_parts.append(rules_text)
+# 调试用: 取消注释可在终端显示 rules
+# msg_parts.append("")
+# msg_parts.append(rules_text)
 msg_parts.append("")
 msg_parts.append(f"Manage memories @ http://localhost:{port}")
 system_message = "\n".join(msg_parts)
