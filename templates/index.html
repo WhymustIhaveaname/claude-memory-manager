@@ -538,8 +538,27 @@ body {
   word-wrap: break-word;
   font-family: var(--font-mono);
   font-size: 13px;
-  line-height: 1.8;
+  line-height: 1.5;
   tab-size: 2;
+  counter-reset: line;
+}
+.settings-body .json-line {
+  display: block;
+  margin: 0;
+  padding: 0;
+  line-height: 1.5;
+  counter-increment: line;
+}
+.settings-body .json-line::before {
+  content: counter(line);
+  display: inline-block;
+  width: 3.5em;
+  margin-right: 1em;
+  text-align: right;
+  color: var(--text-muted);
+  font-size: 11px;
+  user-select: none;
+  opacity: .5;
 }
 .json-key { color: var(--accent-text); }
 .json-string { color: var(--tag-feedback); }
@@ -870,6 +889,7 @@ body {
     <div class="folders-header">Settings</div>
     <div class="folders-list" id="settingsFolders"></div>
   </div>
+  <div class="settings-gap settings-panel" style="display:none;width:8px;flex-shrink:0"></div>
   <div class="panel settings-viewer settings-panel" id="settingsViewer" style="display:none">
     <div class="empty-state"><span class="empty-icon">&#9881;</span>Select a container to view settings</div>
   </div>
@@ -1503,7 +1523,7 @@ function highlightJSON(raw) {
   let str;
   try { str = JSON.stringify(JSON.parse(raw), null, 2); } catch(e) { str = raw; }
   str = str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  return str
+  str = str
     .replace(/"([^"\\]|\\.)*"\s*:/g, m => `<span class="json-key">${m}</span>`)
     .replace(/:\s*"([^"\\]|\\.)*"/g, m => {
       const i = m.indexOf('"');
@@ -1513,6 +1533,7 @@ function highlightJSON(raw) {
     .replace(/:\s*(true|false)/g, (m, b) => m.replace(b, `<span class="json-bool">${b}</span>`))
     .replace(/:\s*(null)/g, (m, n) => m.replace(n, `<span class="json-null">${n}</span>`))
     .replace(/([{}[\]])/g, '<span class="json-brace">$1</span>');
+  return str.split('\n').map(line => `<span class="json-line">${line}</span>`).join('');
 }
 
 function renderSettingsViewer() {
