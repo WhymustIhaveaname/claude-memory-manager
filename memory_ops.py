@@ -253,3 +253,68 @@ def list_containers(global_dir=None, projects_dir=None):
                 entries = scan_container(mem_dir)
                 containers.append({"id": dirname, "name": _friendly_name(dirname), "path": mem_dir, "count": len(entries)})
     return containers
+
+
+def _decode_project_path(encoded):
+    """Decode an encoded project directory name back to a real filesystem path."""
+    home = str(Path.home())
+    home_user = f"-home-{os.environ.get('USER', 'user')}-"
+    if not encoded.startswith(home_user):
+        return "/" + encoded.replace("-", "/")
+    suffix = encoded[len(home_user):]
+    parts = suffix.split("-")
+    for combo in product(*[["/" , "-"] if i > 0 else [""] for i in range(len(parts))]):
+        candidate = parts[0] + "".join(c + p for c, p in zip(combo[1:], parts[1:]))
+        full = os.path.join(home, candidate)
+        if os.path.isdir(full):
+            return full
+    return os.path.join(home, suffix.replace("-", "/"))
+
+
+def list_settings_containers(global_dir=None, projects_dir=None):
+    """Return list of containers that have settings files."""
+    if global_dir is None:
+        global_dir = str(CLAUDE_DIR)
+    if projects_dir is None:
+        projects_dir = str(PROJECTS_DIR)
+    containers = []
+
+    global_files = []
+    if os.path.isfile(os.path.join(global_dir, "settings.json")):
+        global_files.append("settings.json")
+    if global_files:
+        containers.append({"id": "global", "name": "Global", "files": global_files})
+
+    if os.path.isdir(projects_dir):
+        for dirname in sorted(os.listdir(projects_dir)):
+            project_path = _decode_project_path(dirname)
+            claude_dir = os.path.join(project_path, ".claude")
+            files = []
+            for fname in ("settings.json", "settings.local.json"):
+                if os.path.isfile(os.path.join(claude_dir, fname)):
+                    files.append(fname)
+            if files:
+                containers.append({
+                    "id": dirname,
+                    "name": _friendly_name(dirname),
+                    "files": files,
+                })
+    return containers
+
+
+def get_settings_content(container_id, filename):
+    """Read and return the content of a settings file."""
+    if filename not in ("settings.json", "settings.local.json"):
+        raise ValueError("Invalid settings filename")
+
+    if container_id == "global":
+        filepath = os.path.join(str(CLAUDE_DIR), filename)
+    else:
+        project_path = _decode_project_path(container_id)
+        filepath = os.path.join(project_path, ".claude", filename)
+
+    if not os.path.isfile(filepath):
+        raise FileNotFoundError(f"Settings file not found: {filepath}")
+
+    with open(filepath, "r") as f:
+        return f.read()

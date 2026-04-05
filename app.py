@@ -128,6 +128,22 @@ def import_memories():
 
 
 
+@app.route("/api/settings-containers")
+def get_settings_containers():
+    return jsonify(memory_ops.list_settings_containers())
+
+
+@app.route("/api/settings/<container_id>/<filename>")
+def get_settings(container_id, filename):
+    try:
+        content = memory_ops.get_settings_content(container_id, filename)
+        return jsonify({"content": content})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except FileNotFoundError as e:
+        return jsonify({"error": str(e)}), 404
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=5050)
